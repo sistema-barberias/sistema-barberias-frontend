@@ -158,64 +158,110 @@ onMounted(() => {
 });
 
 // Función para registrar clientes (Flujo de secuencia de creación)
-const ejecutarCrearCliente = () => {
-  const respuesta = controlador.crearCliente(formRegistro.value);
-  alert(respuesta); // Muestra el mensaje de confirmación del diagrama
-  
-  if (!respuesta.includes('Error')) {
-    formRegistro.value = { nombre: '', telefono: '', correo: '', password: '' };
-    vistaAuth.value = 'login'; // Cambia la vista al login
-    ejecutarBuscar();
+const ejecutarCrearCliente = async () => {
+  const respuesta = await controlador.crearCliente(formRegistro.value);
+
+  if (typeof respuesta === 'string') {
+    alert(respuesta);
+    return;
   }
+
+  alert('Usuario creado correctamente');
+
+  formRegistro.value = {
+    nombre: '',
+    telefono: '',
+    correo: '',
+    password: ''
+  };
+
+  vistaAuth.value = 'login';
 };
 
 // Función para buscar en tiempo real (Flujo de secuencia de búsqueda)
-const ejecutarBuscar = () => {
-  listaClientes.value = controlador.buscarCliente(criterioBusqueda.value);
+const ejecutarBuscar = async () => {
+  const respuesta = await controlador.buscarCliente(criterioBusqueda.value);
+
+  console.log('Respuesta de búsqueda:', respuesta);
+
+  if (typeof respuesta === 'string') {
+    console.error(respuesta);
+    return;
+  }
+
+  listaClientes.value = respuesta;
 };
 
 // Función para guardar actualizaciones físicas de campos (Flujo de secuencia de actualización)
-const ejecutarActualizar = () => {
-  const respuesta = controlador.actualizarCliente(clienteEditando.value);
-  alert(respuesta);
-  if (!respuesta.includes('Error')) {
-    clienteEditando.value = null;
-    ejecutarBuscar();
+const ejecutarActualizar = async () => {
+  const respuesta = await controlador.actualizarCliente(
+    clienteEditando.value
+  );
+
+  if (typeof respuesta === 'string') {
+    alert(respuesta);
+    return;
   }
+
+  alert('Cliente actualizado correctamente');
+
+  clienteEditando.value = null;
+
+  await ejecutarBuscar();
 };
 
 // Función para la actualización del Estado (Solicitado por el profe en lugar del Delete)
-const ejecutarCambioEstado = (cliente) => {
-  const copiaCliente = { ...cliente };
-  copiaCliente.estado = copiaCliente.estado === 'Activo' ? 'Inactivo' : 'Activo';
-  controlador.actualizarCliente(copiaCliente);
-  ejecutarBuscar();
+const ejecutarCambioEstado = async (cliente) => {
+  const nuevoEstado = cliente.estado === 'Activo'
+    ? 'Inactivo'
+    : 'Activo';
+
+  const respuesta = await controlador.cambiarEstadoCliente({
+    id_usuario: cliente.id_usuario,
+    estado: nuevoEstado
+  });
+
+  if (typeof respuesta === 'string') {
+    alert(respuesta);
+    return;
+  }
+
+  alert(`Cliente ${nuevoEstado === 'Activo' ? 'activado' : 'inactivado'} correctamente`);
+
+  await ejecutarBuscar();
 };
 
 // Simulación del proceso de autenticación de credenciales
-const login = () => {
+const login = async () => {
   const { correo, password } = formAuth.value;
 
-  // Validación de Administrador
-  if (correo === adminCredenciales.correo && password === adminCredenciales.password) {
+  // Validación temporal del Administrador
+  if (
+    correo === adminCredenciales.correo &&
+    password === adminCredenciales.password
+  ) {
     usuarioLogueado.value = adminCredenciales;
     ejecutarBuscar();
     return;
   }
 
-  // Validación de Clientes
-  const resultados = controlador.buscarCliente(correo);
-  const clienteMatch = resultados.find(c => c.correo === correo && c.password === password);
+  // Login de Clientes mediante el backend
+  const respuesta = await controlador.iniciarSesion({
+    correo,
+    password
+  });
 
-  if (clienteMatch) {
-    if (clienteMatch.estado === 'Inactivo') {
-      alert('Acceso Denegado: Tu usuario se encuentra Inactivo en el sistema. Contacta al administrador.');
-      return;
-    }
-    usuarioLogueado.value = { ...clienteMatch, rol: 'Cliente' };
-  } else {
-    alert('Error: Las credenciales ingresadas no son correctas.');
+  if (typeof respuesta === 'string') {
+    alert(respuesta);
+    return;
   }
+
+  usuarioLogueado.value = respuesta;
+
+  formAuth.value = {
+    correo: '',
+    password: ''
+  };
 };
 
 const logout = () => {

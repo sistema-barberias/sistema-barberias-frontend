@@ -1,43 +1,156 @@
-import { ClienteDAO } from '../dao/ClienteDAO.js';
-import { Cliente } from '../models/Cliente.js';
-
 export class ClienteController {
-  constructor() {
-    this.clienteDAO = new ClienteDAO();
+
+  // Iniciar sesión
+  async iniciarSesion(datos) {
+    if (!datos.correo || !datos.password) {
+      return "Error: El correo y la contraseña son obligatorios";
+    }
+
+    try {
+      const respuesta = await fetch(
+        'http://localhost:3000/api/usuarios/login',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            correo: datos.correo,
+            password: datos.password
+          })
+        }
+      );
+
+      const resultado = await respuesta.json();
+
+      if (!respuesta.ok) {
+        return `Error: ${resultado.mensaje}`;
+      }
+
+      return resultado.usuario;
+
+    } catch (error) {
+      console.error('Error conectando con el backend:', error);
+      return "Error: No se pudo conectar con el servidor";
+    }
   }
 
-  // 1.1 crearCliente()
-  crearCliente(datos) {
+  // Registrar cliente
+  async crearCliente(datos) {
     if (!datos.nombre || !datos.correo || !datos.password) {
       return "Error: Todos los campos son obligatorios";
     }
-    
-    // Validar duplicados utilizando el método buscarCliente del DAO
-    const existe = this.clienteDAO.buscarCliente(datos.correo);
-    if (existe.length > 0 && existe.some(c => c.correo === datos.correo)) {
-      return "Error: Este correo electrónico ya está registrado";
+
+    try {
+      const respuesta = await fetch(
+        'http://localhost:3000/api/usuarios/registro',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            nombre: datos.nombre,
+            correo: datos.correo,
+            telefono: datos.telefono,
+            password: datos.password
+          })
+        }
+      );
+
+      const resultado = await respuesta.json();
+
+      if (!respuesta.ok) {
+        return `Error: ${resultado.mensaje}`;
+      }
+
+      return resultado.usuario;
+
+    } catch (error) {
+      console.error('Error conectando con el backend:', error);
+      return "Error: No se pudo conectar con el servidor";
     }
-
-    const nuevoCliente = new Cliente(null, datos.nombre, datos.correo, datos.telefono, 'Activo');
-    nuevoCliente.password = datos.password; 
-
-    return this.clienteDAO.crearCliente(nuevoCliente);
   }
 
-  // 1.1 buscarCliente()
-  buscarCliente(criterio) {
-    return this.clienteDAO.buscarCliente(criterio);
+  // Buscar clientes
+  async buscarCliente(criterio = '') {
+    try {
+      const respuesta = await fetch(
+        `http://localhost:3000/api/usuarios?criterio=${encodeURIComponent(criterio)}`
+      );
+
+      const resultado = await respuesta.json();
+
+      if (!respuesta.ok) {
+        return `Error: ${resultado.mensaje}`;
+      }
+
+      return resultado;
+
+    } catch (error) {
+      console.error('Error buscando usuarios:', error);
+      return "Error: No se pudo conectar con el servidor";
+    }
   }
 
-  // 1.1 actualizarCliente() (Sirve tanto para editar datos como para cambiar el Estado)
-  actualizarCliente(datos) {
-    if (!datos.nombre || !datos.correo) {
-      return "Error: El nombre y el correo no pueden estar vacíos";
-    }
-    
-    const clienteModificado = new Cliente(datos.idCliente, datos.nombre, datos.correo, datos.telefono, datos.estado);
-    if (datos.password) clienteModificado.password = datos.password;
+  // Actualizar cliente
+  async actualizarCliente(datos) {
+    try {
+      const respuesta = await fetch(
+        `http://localhost:3000/api/usuarios/${datos.id_usuario}`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            nombre: datos.nombre,
+            telefono: datos.telefono
+          })
+        }
+      );
 
-    return this.clienteDAO.actualizarCliente(clienteModificado);
+      const resultado = await respuesta.json();
+
+      if (!respuesta.ok) {
+        return `Error: ${resultado.mensaje}`;
+      }
+
+      return resultado.usuario;
+
+    } catch (error) {
+      console.error('Error actualizando usuario:', error);
+      return "Error: No se pudo conectar con el servidor";
+    }
+  }
+
+  // Cambiar estado
+  async cambiarEstadoCliente(datos) {
+    try {
+      const respuesta = await fetch(
+        `http://localhost:3000/api/usuarios/${datos.id_usuario}/estado`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            estado: datos.estado
+          })
+        }
+      );
+
+      const resultado = await respuesta.json();
+
+      if (!respuesta.ok) {
+        return `Error: ${resultado.mensaje}`;
+      }
+
+      return resultado.usuario;
+
+    } catch (error) {
+      console.error('Error actualizando estado:', error);
+      return "Error: No se pudo conectar con el servidor";
+    }
   }
 }
