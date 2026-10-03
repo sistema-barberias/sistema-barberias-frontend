@@ -1,130 +1,165 @@
 <template>
-  <div id="app" class="container">
+  <div class="app">
     <header class="app-header">
-      <div class="logo-area">
-        <h2>💈 BarberSys - Sprint 1</h2>
-      </div>
-      <div v-if="usuarioLogueado" class="session-area">
-        <span>Sesión: <strong>{{ usuarioLogueado.nombre }} ({{ usuarioLogueado.rol }})</strong></span>
-        <button @click="logout" class="btn-logout">Cerrar Sesión</button>
+      <div class="header-inner">
+        <h1 class="brand">BarberFlow</h1>
+        <div v-if="usuarioLogueado" class="session-area">
+          <span class="session-text">
+            <strong>{{ usuarioLogueado.nombre }}</strong>
+            <small>{{ usuarioLogueado.rol }}</small>
+          </span>
+          <button @click="logout" class="btn btn-outline">Cerrar sesión</button>
+        </div>
       </div>
     </header>
 
-    <section v-if="!usuarioLogueado" class="auth-section">
-      <div class="tabs">
-        <button @click="vistaAuth = 'login'" :class="{ active: vistaAuth === 'login' }">Iniciar Sesión</button>
-        <button @click="vistaAuth = 'registro'" :class="{ active: vistaAuth === 'registro' }">Registrarse de forma Pública</button>
-      </div>
+    <main class="main">
+      <!-- ============ AUTENTICACIÓN ============ -->
+      <section v-if="!usuarioLogueado" class="auth-section">
+        <div class="auth-card">
+          <div class="tabs" role="tablist">
+            <button
+              role="tab"
+              @click="vistaAuth = 'login'"
+              :class="{ active: vistaAuth === 'login' }"
+            >Iniciar sesión</button>
+            <button
+              role="tab"
+              @click="vistaAuth = 'registro'"
+              :class="{ active: vistaAuth === 'registro' }"
+            >Crear cuenta</button>
+          </div>
 
-      <div v-if="vistaAuth === 'login'" class="form-card">
-        <h3>Ingreso al Sistema</h3>
-        <form @submit.prevent="login">
-          <div class="form-group">
-            <label>Correo Electrónico:</label>
-            <input type="email" v-model="formAuth.correo" placeholder="ejemplo@correo.com" required>
-          </div>
-          <div class="form-group">
-            <label>Contraseña:</label>
-            <input type="password" v-model="formAuth.password" placeholder="••••••••" required>
-          </div>
-          <button type="submit" class="btn-primary">Ingresar</button>
-        </form>
-      </div>
+          <form v-if="vistaAuth === 'login'" @submit.prevent="login" class="form">
+            <h2>Bienvenido de nuevo</h2>
+            <div class="form-group">
+              <label for="login-correo">Correo electrónico</label>
+              <input id="login-correo" type="email" v-model="formAuth.correo" placeholder="ejemplo@correo.com" required>
+            </div>
+            <div class="form-group">
+              <label for="login-pass">Contraseña</label>
+              <input id="login-pass" type="password" v-model="formAuth.password" placeholder="••••••••" required>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block">Ingresar</button>
+          </form>
 
-      <div v-if="vistaAuth === 'registro'" class="form-card">
-        <h3>Crear Cuenta de Cliente</h3>
-        <form @submit.prevent="ejecutarCrearCliente">
-          <div class="form-group">
-            <label>Nombre Completo:</label>
-            <input type="text" v-model="formRegistro.nombre" placeholder="Tu Nombre" required>
-          </div>
-          <div class="form-group">
-            <label>Teléfono:</label>
-            <input type="text" v-model="formRegistro.telefono" placeholder="Número de celular" required>
-          </div>
-          <div class="form-group">
-            <label>Correo Electrónico:</label>
-            <input type="email" v-model="formRegistro.correo" placeholder="correo@ejemplo.com" required>
-          </div>
-          <div class="form-group">
-            <label>Contraseña de Seguridad:</label>
-            <input type="password" v-model="formRegistro.password" placeholder="Crea una contraseña" required>
-          </div>
-          <button type="submit" class="btn-success">Completar Registro</button>
-        </form>
-      </div>
-    </section>
-
-    <section v-else class="content-section">
-      
-      <div v-if="usuarioLogueado.rol === 'Cliente'" class="welcome-card">
-        <h2>¡Hola, {{ usuarioLogueado.nombre }}! 👋</h2>
-        <p>Tu cuenta se encuentra actualmente en estado: <span class="badge Activo">{{ usuarioLogueado.estado }}</span></p>
-        <div class="info-box">
-          <p><strong>Correo:</strong> {{ usuarioLogueado.correo }}</p>
-          <p><strong>Teléfono:</strong> {{ usuarioLogueado.telefono }}</p>
+          <form v-else @submit.prevent="ejecutarCrearCliente" class="form">
+            <h2>Crea tu cuenta de cliente</h2>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="reg-nombre">Nombre completo</label>
+                <input id="reg-nombre" type="text" v-model="formRegistro.nombre" placeholder="Tu nombre" required>
+              </div>
+              <div class="form-group">
+                <label for="reg-tel">Teléfono</label>
+                <input id="reg-tel" type="text" v-model="formRegistro.telefono" placeholder="Número de celular" required>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="reg-correo">Correo electrónico</label>
+              <input id="reg-correo" type="email" v-model="formRegistro.correo" placeholder="correo@ejemplo.com" required>
+            </div>
+            <div class="form-group">
+              <label for="reg-pass">Contraseña</label>
+              <input id="reg-pass" type="password" v-model="formRegistro.password" placeholder="Crea una contraseña" required>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block">Crear cuenta</button>
+          </form>
         </div>
-        <p class="hint">El módulo para agendar tus citas estará disponible en el Sprint 2.</p>
-      </div>
+      </section>
 
-      <div v-else-if="usuarioLogueado.rol === 'Administrador'" class="admin-panel">
-        <div class="panel-header">
-          <h3>Panel de Control - Administración de Clientes</h3>
-        </div>
-        
-        <div class="search-box">
-          <input 
-            type="text" 
-            v-model="criterioBusqueda" 
-            @input="ejecutarBuscar" 
-            placeholder="🔍 Buscar clientes por nombre, apellido o correo electrónico..."
-          >
+      <!-- ============ CONTENIDO CON SESIÓN ============ -->
+      <section v-else class="content-section">
+        <!-- Cliente -->
+        <div v-if="usuarioLogueado.rol === 'Cliente'" class="client-view">
+          <div class="card welcome-card">
+            <h2>¡Hola, {{ usuarioLogueado.nombre }}!</h2>
+            <p class="muted">
+              Estado de tu cuenta:
+              <span :class="['badge', usuarioLogueado.estado]">{{ usuarioLogueado.estado }}</span>
+            </p>
+          </div>
+          <div class="grid-2">
+            <div class="card">
+              <span class="label">Correo</span>
+              <p class="value">{{ usuarioLogueado.correo }}</p>
+            </div>
+            <div class="card">
+              <span class="label">Teléfono</span>
+              <p class="value">{{ usuarioLogueado.telefono }}</p>
+            </div>
+          </div>
+          <p class="hint">Pronto podrás agendar tus citas desde aquí.</p>
         </div>
 
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Nombre</th>
-              <th>Teléfono</th>
-              <th>Correo Electrónico</th>
-              <th>Estado</th>
-              <th>Acciones de Gestión</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="cliente in listaClientes" :key="cliente.correo">
-              <td>
-                <input v-if="clienteEditando?.correo === cliente.correo" type="text" v-model="clienteEditando.nombre" class="table-input">
-                <span v-else>{{ cliente.nombre }}</span>
-              </td>
-              <td>
-                <input v-if="clienteEditando?.correo === cliente.correo" type="text" v-model="clienteEditando.telefono" class="table-input">
-                <span v-else>{{ cliente.telefono }}</span>
-              </td>
-              <td>{{ cliente.correo }}</td>
-              <td>
-                <span :class="['badge', cliente.estado]">{{ cliente.estado }}</span>
-              </td>
-              <td>
-                <div v-if="clienteEditando?.correo === cliente.correo" class="actions-cell">
-                  <button @click="ejecutarActualizar" class="btn-action btn-save">Guardar</button>
-                  <button @click="clienteEditando = null" class="btn-action btn-cancel">Cancelar</button>
-                </div>
-                <div v-else class="actions-cell">
-                  <button @click="clienteEditando = { ...cliente }" class="btn-action btn-edit">Editar Datos</button>
-                  <button @click="ejecutarCambioEstado(cliente)" :class="['btn-action', cliente.estado === 'Activo' ? 'btn-disable' : 'btn-enable']">
-                    {{ cliente.estado === 'Activo' ? 'Inactivar' : 'Activar' }}
-                  </button>
-                </div>
-              </td>
-            </tr>
-            <tr v-if="listaClientes.length === 0">
-              <td colspan="5" class="no-data">No se encontraron registros que coincidan con la búsqueda.</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
+        <!-- Administrador -->
+        <div v-else-if="usuarioLogueado.rol === 'Administrador'" class="card admin-panel">
+          <div class="panel-header">
+            <h2>Clientes</h2>
+            <input
+              class="search-input"
+              type="search"
+              v-model="criterioBusqueda"
+              @input="ejecutarBuscar"
+              placeholder="Buscar por nombre, teléfono o correo"
+            >
+          </div>
+
+          <div class="table-wrap">
+            <table class="data-table">
+              <colgroup>
+                <col style="width: 24%">
+                <col style="width: 16%">
+                <col style="width: 28%">
+                <col style="width: 12%">
+                <col style="width: 20%">
+              </colgroup>
+              <thead>
+                <tr>
+                  <th>Nombre</th>
+                  <th>Teléfono</th>
+                  <th>Correo</th>
+                  <th>Estado</th>
+                  <th class="col-actions">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="cliente in listaClientes" :key="cliente.correo">
+                  <td>
+                    <input v-if="clienteEditando?.correo === cliente.correo" type="text" v-model="clienteEditando.nombre" class="table-input">
+                    <span v-else>{{ cliente.nombre }}</span>
+                  </td>
+                  <td>
+                    <input v-if="clienteEditando?.correo === cliente.correo" type="text" v-model="clienteEditando.telefono" class="table-input">
+                    <span v-else>{{ cliente.telefono }}</span>
+                  </td>
+                  <td class="cell-email">{{ cliente.correo }}</td>
+                  <td>
+                    <span :class="['badge', cliente.estado]">{{ cliente.estado }}</span>
+                  </td>
+                  <td class="col-actions">
+                    <div v-if="clienteEditando?.correo === cliente.correo" class="actions-cell">
+                      <button @click="ejecutarActualizar" class="btn btn-sm btn-primary">Guardar</button>
+                      <button @click="clienteEditando = null" class="btn btn-sm btn-outline">Cancelar</button>
+                    </div>
+                    <div v-else class="actions-cell">
+                      <button @click="clienteEditando = { ...cliente }" class="btn btn-sm btn-outline">Editar</button>
+                      <button
+                        @click="ejecutarCambioEstado(cliente)"
+                        :class="['btn', 'btn-sm', cliente.estado === 'Activo' ? 'btn-danger' : 'btn-ok']"
+                      >{{ cliente.estado === 'Activo' ? 'Inactivar' : 'Activar' }}</button>
+                    </div>
+                  </td>
+                </tr>
+                <tr v-if="listaClientes.length === 0">
+                  <td colspan="5" class="no-data">No hay clientes que coincidan con la búsqueda.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </main>
   </div>
 </template>
 
@@ -144,14 +179,6 @@ const clienteEditando = ref(null);
 
 const formAuth = ref({ correo: '', password: '' });
 const formRegistro = ref({ nombre: '', telefono: '', correo: '', password: '' });
-
-// Administrador maestro del sistema
-const adminCredenciales = {
-  correo: 'admin@barberia.com',
-  password: 'admin',
-  nombre: 'Administrador Principal',
-  rol: 'Administrador'
-};
 
 onMounted(() => {
   ejecutarBuscar(); // Carga los clientes predeterminados al iniciar la pantalla
@@ -235,17 +262,6 @@ const ejecutarCambioEstado = async (cliente) => {
 const login = async () => {
   const { correo, password } = formAuth.value;
 
-  // Validación temporal del Administrador
-  if (
-    correo === adminCredenciales.correo &&
-    password === adminCredenciales.password
-  ) {
-    usuarioLogueado.value = adminCredenciales;
-    ejecutarBuscar();
-    return;
-  }
-
-  // Login de Clientes mediante el backend
   const respuesta = await controlador.iniciarSesion({
     correo,
     password
@@ -271,35 +287,189 @@ const logout = () => {
 </script>
 
 <style scoped>
-/* Paleta de colores elegante tipo Barbería (Oscuros, Grises, Blancos y acentos limpios) */
-.container { max-width: 950px; margin: 40px auto; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 0 20px; }
-.app-header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 15px; border-bottom: 3px solid #1a1a1a; margin-bottom: 25px; }
-.tabs { display: flex; margin-bottom: 20px; }
-.tabs button { flex: 1; padding: 12px; background: #e0e0e0; border: none; cursor: pointer; font-size: 16px; font-weight: bold; transition: 0.3s; }
-.tabs button.active { background: #1a1a1a; color: #fff; }
-.form-card { background: #f9f9f9; padding: 25px; border: 1px solid #ddd; border-radius: 6px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-.form-group { margin-bottom: 15px; }
-.form-group label { display: block; margin-bottom: 5px; font-weight: 600; }
-.form-group input { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-.search-box input { width: 100%; padding: 12px; border: 2px solid #1a1a1a; border-radius: 4px; font-size: 15px; margin-bottom: 20px; }
-.data-table { width: 100%; border-collapse: collapse; margin-top: 10px; background: white; }
-.data-table th, .data-table td { padding: 12px; border: 1px solid #ddd; text-align: left; }
-.data-table th { background: #1a1a1a; color: white; }
-.table-input { padding: 6px; border: 1px solid #222; border-radius: 3px; width: 85%; }
-.badge { padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: bold; display: inline-block; }
-.badge.Activo { background: #d4edda; color: #155724; }
-.badge.Inactivo { background: #f8d7da; color: #721c24; }
-.actions-cell { display: flex; gap: 5px; }
-.btn-action { padding: 6px 12px; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; font-size: 13px; }
-.btn-edit { background: #ffc107; color: #000; }
-.btn-disable { background: #dc3545; color: white; }
-.btn-enable { background: #28a745; color: white; }
-.btn-save { background: #007bff; color: white; }
-.btn-cancel { background: #6c757d; color: white; }
-.btn-primary { background: #1a1a1a; color: white; width: 100%; padding: 12px; border: none; font-size: 16px; cursor: pointer; }
-.btn-success { background: #28a745; color: white; width: 100%; padding: 12px; border: none; font-size: 16px; cursor: pointer; }
-.btn-logout { background: #dc3545; color: white; border: none; padding: 6px 12px; cursor: pointer; border-radius: 4px; margin-left: 10px; }
-.welcome-card { background: #f4f6f9; border-left: 5px solid #1a1a1a; padding: 25px; border-radius: 4px; }
-.info-box { background: white; padding: 15px; border: 1px solid #eee; margin: 15px 0; border-radius: 4px; }
-.no-data { text-align: center; color: #777; font-style: italic; }
+/* ---------- Tokens ---------- */
+.app {
+  --bg: #f4f5f7;
+  --surface: #ffffff;
+  --ink: #16213a;          /* azul marino */
+  --text: #232a3b;
+  --muted: #6a7285;
+  --line: #e1e4ea;
+  --red: #b3262e;          /* rojo poste de barbero */
+  --red-dark: #8f1d24;
+  --green: #1f7a4d;
+  --radius: 10px;
+  --gap: 24px;
+
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif;
+  line-height: 1.5;
+}
+.app *, .app *::before, .app *::after { box-sizing: border-box; }
+
+/* ---------- Header (franja de poste de barbero) ---------- */
+.app-header {
+  background: var(--ink);
+  color: #fff;
+  border-top: 6px solid transparent;
+  border-image: repeating-linear-gradient(
+    135deg, var(--red) 0 14px, #fff 14px 28px, #2c4a8a 28px 42px
+  ) 6;
+}
+.header-inner {
+  width: 100%;
+  padding: 16px 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.brand {
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: .3px;
+  color: #fff;
+}
+
+.session-area {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.session-text {
+  display: flex;
+  flex-direction: column;
+  text-align: right;
+  line-height: 1.2;
+}
+
+.session-text small {
+  color: #b9c0d0;
+}
+
+/* ---------- Layout ---------- */
+.main { width: 100%; padding: 40px; }
+.auth-section { display: flex; justify-content: center; }
+.auth-card {
+  width: 100%;
+  max-width: 460px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: var(--gap);
+}
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--gap); }
+.client-view { display: flex; flex-direction: column; gap: var(--gap); width: 100%; }
+
+/* ---------- Tabs ---------- */
+.tabs { display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid var(--line); }
+.tabs button {
+  padding: 16px;
+  background: #f8f9fb;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+}
+.tabs button.active { background: var(--surface); color: var(--ink); border-bottom-color: var(--red); }
+.tabs button:focus-visible { outline: 2px solid var(--red); outline-offset: -2px; }
+
+/* ---------- Formularios ---------- */
+.form { padding: 32px; display: flex; flex-direction: column; gap: 18px; }
+.form h2 { font-size: 1.3rem; color: var(--ink); }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.form-group { display: flex; flex-direction: column; gap: 6px; }
+.form-group label { font-size: .9rem; font-weight: 600; color: var(--ink); }
+.form-group input,
+.search-input,
+.table-input {
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid #c9ced8;
+  border-radius: 8px;
+  font-size: 1rem;
+  background: #fff;
+  color: var(--text);
+}
+.form-group input:focus,
+.search-input:focus,
+.table-input:focus { outline: 2px solid var(--red); outline-offset: 0; border-color: transparent; }
+
+/* ---------- Botones ---------- */
+.btn {
+  padding: 10px 18px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font-size: .95rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
+.btn-block { width: 100%; padding: 12px; font-size: 1rem; }
+.btn-sm { padding: 6px 12px; font-size: .85rem; }
+.btn-primary { background: var(--red); color: #fff; }
+.btn-primary:hover { background: var(--red-dark); }
+.btn-outline { background: transparent; border-color: #9aa3b8; color: inherit; }
+.btn-outline:hover { background: rgba(120, 130, 160, .12); }
+.table-wrap .btn-outline { border-color: var(--line); color: var(--ink); }
+.btn-danger { background: #fff; border-color: var(--red); color: var(--red); }
+.btn-danger:hover { background: var(--red); color: #fff; }
+.btn-ok { background: #fff; border-color: var(--green); color: var(--green); }
+.btn-ok:hover { background: var(--green); color: #fff; }
+
+/* ---------- Cliente ---------- */
+.welcome-card h2 { font-size: 1.6rem; color: var(--ink); margin-bottom: 8px; }
+.muted { color: var(--muted); }
+.label { font-size: .85rem; color: var(--muted); }
+.value { font-size: 1.1rem; font-weight: 600; color: var(--ink); word-break: break-word; }
+.hint { text-align: center; color: var(--muted); }
+
+/* ---------- Admin ---------- */
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: var(--gap);
+}
+.panel-header h2 { font-size: 1.4rem; color: var(--ink); }
+.search-input { max-width: 380px; }
+
+.table-wrap { overflow-x: auto; }
+.data-table { width: 100%; min-width: 760px; border-collapse: collapse; table-layout: fixed; }
+.data-table th,
+.data-table td { padding: 14px 12px; text-align: left; vertical-align: middle; border-bottom: 1px solid var(--line); }
+.data-table th { font-size: .85rem; font-weight: 700; color: var(--muted); background: #f8f9fb; }
+.data-table tbody tr:hover { background: #fafbfc; }
+.cell-email { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.col-actions { text-align: right !important; }
+.actions-cell { display: flex; gap: 8px; justify-content: flex-end; }
+.no-data { text-align: center !important; color: var(--muted); padding: 32px 12px !important; }
+
+.badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: .8rem; font-weight: 700; }
+.badge.Activo { background: #e1f3ea; color: #17623c; }
+.badge.Inactivo { background: #f4e0e1; color: #8f1d24; }
+
+/* ---------- Responsive ---------- */
+@media (max-width: 640px) {
+  .main { padding: 24px 16px; }
+  .header-inner { padding: 12px 16px; }
+  .form { padding: 24px 20px; }
+  .form-row, .grid-2 { grid-template-columns: 1fr; }
+  .panel-header { flex-direction: column; align-items: stretch; }
+  .search-input { max-width: none; }
+  .session-text { display: none; }
+}
 </style>
