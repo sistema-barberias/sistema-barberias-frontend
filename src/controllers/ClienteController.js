@@ -1,3 +1,5 @@
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
 export class ClienteController {
 
   // Iniciar sesión
@@ -8,7 +10,7 @@ export class ClienteController {
 
     try {
       const respuesta = await fetch(
-        'http://localhost:3000/api/usuarios/login',
+        `${API_URL}/api/usuarios/login`,
         {
           method: 'POST',
           headers: {
@@ -43,7 +45,7 @@ export class ClienteController {
 
     try {
       const respuesta = await fetch(
-        'http://localhost:3000/api/usuarios/registro',
+        `${API_URL}/api/usuarios/registro`,
         {
           method: 'POST',
           headers: {
@@ -76,7 +78,7 @@ export class ClienteController {
   async buscarCliente(criterio = '') {
     try {
       const respuesta = await fetch(
-        `http://localhost:3000/api/usuarios?criterio=${encodeURIComponent(criterio)}`
+        `${API_URL}/api/usuarios?criterio=${encodeURIComponent(criterio)}`
       );
 
       const resultado = await respuesta.json();
@@ -97,7 +99,7 @@ export class ClienteController {
   async actualizarCliente(datos) {
     try {
       const respuesta = await fetch(
-        `http://localhost:3000/api/usuarios/${datos.id_usuario}`,
+        `${API_URL}/api/usuarios/${datos.id_usuario}`,
         {
           method: 'PUT',
           headers: {
@@ -128,7 +130,7 @@ export class ClienteController {
   async cambiarEstadoCliente(datos) {
     try {
       const respuesta = await fetch(
-        `http://localhost:3000/api/usuarios/${datos.id_usuario}/estado`,
+        `${API_URL}/api/usuarios/${datos.id_usuario}/estado`,
         {
           method: 'PATCH',
           headers: {
