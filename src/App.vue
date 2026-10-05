@@ -20,18 +20,19 @@
           <div class="tabs" role="tablist">
             <button
               role="tab"
-              @click="vistaAuth = 'login'"
+              @click="cambiarVista('login')"
               :class="{ active: vistaAuth === 'login' }"
             >Iniciar sesión</button>
             <button
               role="tab"
-              @click="vistaAuth = 'registro'"
+              @click="cambiarVista('registro')"
               :class="{ active: vistaAuth === 'registro' }"
             >Crear cuenta</button>
           </div>
 
           <form v-if="vistaAuth === 'login'" @submit.prevent="login" class="form">
             <h2>Bienvenido de nuevo</h2>
+            <p v-if="mensaje.texto" :class="['alert', mensaje.tipo]" role="alert">{{ mensaje.texto }}</p>
             <div class="form-group">
               <label for="login-correo">Correo electrónico</label>
               <input id="login-correo" type="email" v-model="formAuth.correo" placeholder="ejemplo@correo.com" required>
@@ -43,8 +44,9 @@
             <button type="submit" class="btn btn-primary btn-block">Ingresar</button>
           </form>
 
-          <form v-else @submit.prevent="ejecutarCrearCliente" class="form">
+          <form v-else @submit.prevent="ejecutarCrearCliente" class="form" novalidate>
             <h2>Crea tu cuenta de cliente</h2>
+            <p v-if="mensaje.texto" :class="['alert', mensaje.tipo]" role="alert">{{ mensaje.texto }}</p>
             <div class="form-row">
               <div class="form-group">
                 <label for="reg-nombre">Nombre completo</label>
@@ -59,11 +61,19 @@
               <label for="reg-correo">Correo electrónico</label>
               <input id="reg-correo" type="email" v-model="formRegistro.correo" placeholder="correo@ejemplo.com" required>
             </div>
-            <div class="form-group">
-              <label for="reg-pass">Contraseña</label>
-              <input id="reg-pass" type="password" v-model="formRegistro.password" placeholder="Crea una contraseña" required>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="reg-pass">Contraseña</label>
+                <input id="reg-pass" type="password" v-model="formRegistro.password" placeholder="Mínimo 6 caracteres" required>
+              </div>
+              <div class="form-group">
+                <label for="reg-pass2">Confirmar contraseña</label>
+                <input id="reg-pass2" type="password" v-model="formRegistro.confirmarPassword" placeholder="Repite la contraseña" required>
+              </div>
             </div>
-            <button type="submit" class="btn btn-primary btn-block">Crear cuenta</button>
+            <button type="submit" class="btn btn-primary btn-block" :disabled="enviando">
+              {{ enviando ? 'Creando cuenta...' : 'Crear cuenta' }}
+            </button>
           </form>
         </div>
       </section>
@@ -96,14 +106,56 @@
         <div v-else-if="usuarioLogueado.rol === 'Administrador'" class="card admin-panel">
           <div class="panel-header">
             <h2>Clientes</h2>
-            <input
-              class="search-input"
-              type="search"
-              v-model="criterioBusqueda"
-              @input="ejecutarBuscar"
-              placeholder="Buscar por nombre, teléfono o correo"
-            >
+            <div class="panel-actions">
+              <input
+                class="search-input"
+                type="search"
+                v-model="criterioBusqueda"
+                @input="ejecutarBuscar"
+                placeholder="Buscar por nombre, teléfono o correo"
+              >
+              <button class="btn btn-primary" @click="alternarFormNuevo">
+                {{ mostrarFormNuevo ? 'Cerrar' : '+ Nuevo cliente' }}
+              </button>
+            </div>
           </div>
+
+          <p v-if="!mostrarFormNuevo && mensajeAdmin.texto" :class="['alert', mensajeAdmin.tipo]" role="alert">{{ mensajeAdmin.texto }}</p>
+
+          <form v-if="mostrarFormNuevo" @submit.prevent="ejecutarCrearClienteAdmin" class="new-client-form" novalidate>
+            <h3>Nuevo cliente</h3>
+            <p v-if="mensajeAdmin.texto" :class="['alert', mensajeAdmin.tipo]" role="alert">{{ mensajeAdmin.texto }}</p>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="adm-nombre">Nombre completo</label>
+                <input id="adm-nombre" type="text" v-model="formNuevo.nombre" placeholder="Nombre del cliente" required>
+              </div>
+              <div class="form-group">
+                <label for="adm-tel">Teléfono</label>
+                <input id="adm-tel" type="text" v-model="formNuevo.telefono" placeholder="Número de celular" required>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="adm-correo">Correo electrónico</label>
+              <input id="adm-correo" type="email" v-model="formNuevo.correo" placeholder="correo@ejemplo.com" required>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="adm-pass">Contraseña</label>
+                <input id="adm-pass" type="password" v-model="formNuevo.password" placeholder="Mínimo 6 caracteres" required>
+              </div>
+              <div class="form-group">
+                <label for="adm-pass2">Confirmar contraseña</label>
+                <input id="adm-pass2" type="password" v-model="formNuevo.confirmarPassword" placeholder="Repite la contraseña" required>
+              </div>
+            </div>
+            <div class="form-actions">
+              <button type="button" class="btn btn-outline" @click="alternarFormNuevo">Cancelar</button>
+              <button type="submit" class="btn btn-primary" :disabled="enviandoAdmin">
+                {{ enviandoAdmin ? 'Creando cliente...' : 'Crear cliente' }}
+              </button>
+            </div>
+          </form>
 
           <div class="table-wrap">
             <table class="data-table">
@@ -178,7 +230,31 @@ const listaClientes = ref([]);
 const clienteEditando = ref(null);
 
 const formAuth = ref({ correo: '', password: '' });
-const formRegistro = ref({ nombre: '', telefono: '', correo: '', password: '' });
+const formRegistro = ref({ nombre: '', telefono: '', correo: '', password: '', confirmarPassword: '' });
+const mensaje = ref({ tipo: '', texto: '' });
+const enviando = ref(false);
+
+const cambiarVista = (vista) => {
+  vistaAuth.value = vista;
+  mensaje.value = { tipo: '', texto: '' };
+};
+
+// Validaciones del registro (el backend vuelve a validar: esto es solo para dar respuesta rápida)
+const validarRegistro = (f) => {
+  if (!f.nombre.trim() || !f.telefono.trim() || !f.correo.trim() || !f.password || !f.confirmarPassword) {
+    return 'Completa todos los campos obligatorios.';
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.correo.trim())) {
+    return 'El correo electrónico no tiene un formato válido.';
+  }
+  if (f.password.length < 6) {
+    return 'La contraseña debe tener al menos 6 caracteres.';
+  }
+  if (f.password !== f.confirmarPassword) {
+    return 'Las contraseñas no coinciden.';
+  }
+  return null;
+};
 
 onMounted(() => {
   ejecutarBuscar(); // Carga los clientes predeterminados al iniciar la pantalla
@@ -186,23 +262,89 @@ onMounted(() => {
 
 // Función para registrar clientes (Flujo de secuencia de creación)
 const ejecutarCrearCliente = async () => {
-  const respuesta = await controlador.crearCliente(formRegistro.value);
+  const f = formRegistro.value;
 
-  if (typeof respuesta === 'string') {
-    alert(respuesta);
+  const errorValidacion = validarRegistro(f);
+  if (errorValidacion) {
+    mensaje.value = { tipo: 'error', texto: errorValidacion };
     return;
   }
 
-  alert('Usuario creado correctamente');
+  enviando.value = true;
+  mensaje.value = { tipo: '', texto: '' };
 
-  formRegistro.value = {
-    nombre: '',
-    telefono: '',
-    correo: '',
-    password: ''
-  };
+  try {
+    // Solo se envían los datos personales: el rol y el estado los asigna el backend
+    const respuesta = await controlador.crearCliente({
+      nombre: f.nombre.trim(),
+      telefono: f.telefono.trim(),
+      correo: f.correo.trim(),
+      password: f.password
+    });
 
-  vistaAuth.value = 'login';
+    if (typeof respuesta === 'string') {
+      mensaje.value = { tipo: 'error', texto: respuesta.replace(/^Error:\s*/, '') };
+      return;
+    }
+
+    formRegistro.value = { nombre: '', telefono: '', correo: '', password: '', confirmarPassword: '' };
+    vistaAuth.value = 'login';
+    mensaje.value = { tipo: 'exito', texto: 'Cuenta creada correctamente. Ya puedes iniciar sesión.' };
+  } catch (error) {
+    mensaje.value = { tipo: 'error', texto: 'No se pudo conectar con el servidor. Inténtalo de nuevo en unos minutos.' };
+  } finally {
+    enviando.value = false;
+  }
+};
+
+// El administrador crea un cliente (usa la misma ruta y validaciones que el registro público;
+// el backend siempre asigna rol Cliente y estado Activo)
+const formVacio = () => ({ nombre: '', telefono: '', correo: '', password: '', confirmarPassword: '' });
+const formNuevo = ref(formVacio());
+const mostrarFormNuevo = ref(false);
+const enviandoAdmin = ref(false);
+const mensajeAdmin = ref({ tipo: '', texto: '' });
+
+const alternarFormNuevo = () => {
+  mostrarFormNuevo.value = !mostrarFormNuevo.value;
+  formNuevo.value = formVacio();
+  mensajeAdmin.value = { tipo: '', texto: '' };
+};
+
+const ejecutarCrearClienteAdmin = async () => {
+  const f = formNuevo.value;
+
+  const errorValidacion = validarRegistro(f);
+  if (errorValidacion) {
+    mensajeAdmin.value = { tipo: 'error', texto: errorValidacion };
+    return;
+  }
+
+  enviandoAdmin.value = true;
+  mensajeAdmin.value = { tipo: '', texto: '' };
+
+  try {
+    const respuesta = await controlador.crearCliente({
+      nombre: f.nombre.trim(),
+      telefono: f.telefono.trim(),
+      correo: f.correo.trim(),
+      password: f.password
+    });
+
+    if (typeof respuesta === 'string') {
+      mensajeAdmin.value = { tipo: 'error', texto: respuesta.replace(/^Error:\s*/, '') };
+      return;
+    }
+
+    formNuevo.value = formVacio();
+    mostrarFormNuevo.value = false;
+    mensajeAdmin.value = { tipo: 'exito', texto: `Cliente "${respuesta.nombre}" creado correctamente.` };
+    await ejecutarBuscar();
+  } catch (error) {
+    mensajeAdmin.value = { tipo: 'error', texto: 'No se pudo conectar con el servidor. Inténtalo de nuevo en unos minutos.' };
+  } finally {
+    enviandoAdmin.value = false;
+  }
 };
 
 // Función para buscar en tiempo real (Flujo de secuencia de búsqueda)
@@ -282,6 +424,8 @@ const login = async () => {
 
 const logout = () => {
   usuarioLogueado.value = null;
+  mostrarFormNuevo.value = false;
+  mensajeAdmin.value = { tipo: '', texto: '' };
   formAuth.value = { correo: '', password: '' };
 };
 </script>
@@ -326,29 +470,10 @@ const logout = () => {
   justify-content: space-between;
   gap: 16px;
 }
-.brand {
-  font-size: 1.35rem;
-  font-weight: 700;
-  letter-spacing: .3px;
-  color: #fff;
-}
-
-.session-area {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.session-text {
-  display: flex;
-  flex-direction: column;
-  text-align: right;
-  line-height: 1.2;
-}
-
-.session-text small {
-  color: #b9c0d0;
-}
+.brand { font-size: 1.35rem; font-weight: 700; letter-spacing: .3px; }
+.session-area { display: flex; align-items: center; gap: 16px; }
+.session-text { display: flex; flex-direction: column; text-align: right; line-height: 1.2; }
+.session-text small { color: #b9c0d0; }
 
 /* ---------- Layout ---------- */
 .main { width: 100%; padding: 40px; }
@@ -429,6 +554,13 @@ const logout = () => {
 .btn-ok { background: #fff; border-color: var(--green); color: var(--green); }
 .btn-ok:hover { background: var(--green); color: #fff; }
 
+.btn:disabled { opacity: .6; cursor: not-allowed; }
+
+/* ---------- Mensajes ---------- */
+.alert { padding: 12px 14px; border-radius: 8px; font-size: .92rem; border: 1px solid transparent; }
+.alert.error { background: #f9e7e8; border-color: #e8bcbf; color: var(--red-dark); }
+.alert.exito { background: #e1f3ea; border-color: #b6dcc8; color: #17623c; }
+
 /* ---------- Cliente ---------- */
 .welcome-card h2 { font-size: 1.6rem; color: var(--ink); margin-bottom: 8px; }
 .muted { color: var(--muted); }
@@ -446,6 +578,23 @@ const logout = () => {
 }
 .panel-header h2 { font-size: 1.4rem; color: var(--ink); }
 .search-input { max-width: 380px; }
+.panel-actions { display: flex; align-items: center; gap: 12px; flex: 1; justify-content: flex-end; }
+.panel-actions .search-input { flex: 1; }
+.panel-actions .btn { flex-shrink: 0; }
+
+.new-client-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: var(--gap);
+  margin-bottom: var(--gap);
+  background: #f8f9fb;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.new-client-form h3 { font-size: 1.1rem; color: var(--ink); }
+.form-actions { display: flex; justify-content: flex-end; gap: 12px; }
+.admin-panel > .alert { margin-bottom: var(--gap); }
 
 .table-wrap { overflow-x: auto; }
 .data-table { width: 100%; min-width: 760px; border-collapse: collapse; table-layout: fixed; }
@@ -470,6 +619,8 @@ const logout = () => {
   .form-row, .grid-2 { grid-template-columns: 1fr; }
   .panel-header { flex-direction: column; align-items: stretch; }
   .search-input { max-width: none; }
+  .panel-actions { flex-direction: column; align-items: stretch; }
+  .form-actions { flex-direction: column-reverse; }
   .session-text { display: none; }
 }
 </style>
