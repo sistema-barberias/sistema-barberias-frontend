@@ -37,11 +37,58 @@ export class ClienteController {
     }
   }
 
+
   // Registrar cliente
   async crearCliente(datos) {
-    if (!datos.nombre || !datos.correo || !datos.password) {
+
+    // ==============================
+    // VALIDAR CAMPOS OBLIGATORIOS
+    // ==============================
+
+    if (!datos.nombre || !datos.correo || !datos.telefono || !datos.password) {
       return "Error: Todos los campos son obligatorios";
     }
+
+
+    // ==============================
+    // VALIDAR CORREO
+    // Solo permite Gmail o Hotmail
+    // ==============================
+
+    const correoValido = /^[^\s@]+@(gmail|hotmail)\.com$/i;
+
+    if (!correoValido.test(datos.correo)) {
+      return "Error: El correo debe ser de Gmail o Hotmail (@gmail.com o @hotmail.com)";
+    }
+
+
+    // ==============================
+    // VALIDAR TELÉFONO
+    // Solo números
+    // ==============================
+
+    const telefonoValido = /^\d+$/;
+
+    if (!telefonoValido.test(datos.telefono)) {
+      return "Error: El teléfono solo puede contener números";
+    }
+
+
+    // ==============================
+    // VALIDAR CONTRASEÑA
+    // Exactamente 6 dígitos numéricos
+    // ==============================
+
+    const passwordValida = /^\d{6}$/;
+
+    if (!passwordValida.test(datos.password)) {
+      return "Error: La contraseña debe tener exactamente 6 dígitos numéricos";
+    }
+
+
+    // ==============================
+    // ENVIAR DATOS AL BACKEND
+    // ==============================
 
     try {
       const respuesta = await fetch(
@@ -74,6 +121,7 @@ export class ClienteController {
     }
   }
 
+
   // Buscar clientes
   async buscarCliente(criterio = '') {
     try {
@@ -94,6 +142,7 @@ export class ClienteController {
       return "Error: No se pudo conectar con el servidor";
     }
   }
+
 
   // Actualizar cliente
   async actualizarCliente(datos) {
@@ -125,6 +174,7 @@ export class ClienteController {
       return "Error: No se pudo conectar con el servidor";
     }
   }
+
 
   // Cambiar estado
   async cambiarEstadoCliente(datos) {
