@@ -1,104 +1,132 @@
+<!--
+  App.vue — Pantalla única de BarberFlow.
+
+  Muestra una de tres vistas según el estado de la sesión:
+    1. Autenticación (sin sesión): iniciar sesión o crear cuenta.
+    2. Cliente: resumen de su cuenta.
+    3. Administrador: gestión de clientes (buscar, crear, editar, activar/inactivar).
+
+  La comunicación con el backend vive en controllers/ClienteController.js.
+-->
 <template>
   <div class="app">
+    <!-- ============ ENCABEZADO ============ -->
     <header class="app-header">
       <div class="header-inner">
         <h1 class="brand">BarberFlow</h1>
+
+        <!-- Datos de sesión: solo visibles si hay un usuario logueado -->
         <div v-if="usuarioLogueado" class="session-area">
           <span class="session-text">
             <strong>{{ usuarioLogueado.nombre }}</strong>
             <small>{{ rolActivo }}</small>
           </span>
+
+          <!-- Menú para alternar entre la vista de Cliente y la de Administrador -->
           <details class="role-switch">
             <summary>Cambiar rol</summary>
             <div class="role-switch-menu">
               <p>Rol actual: <strong>{{ rolActivo }}</strong></p>
               <button
-                v-if="rolActivo === 'Cliente'"
                 type="button"
                 class="btn btn-outline"
-                @click="cambiarRolVista('Administrador')"
-              >Administrador</button>
-              <button
-                v-else
-                type="button"
-                class="btn btn-outline"
-                @click="cambiarRolVista('Cliente')"
-              >Cliente</button>
+                @click="rolVista = rolActivo === 'Cliente' ? 'Administrador' : 'Cliente'"
+              >{{ rolActivo === 'Cliente' ? 'Administrador' : 'Cliente' }}</button>
             </div>
           </details>
-          <button @click="logout" class="btn btn-outline">Cerrar sesión</button>
+
+          <button type="button" class="btn btn-outline" @click="logout">Cerrar sesión</button>
         </div>
       </div>
     </header>
 
     <main class="main">
-      <!-- ============ AUTENTICACIÓN ============ -->
+      <!-- ============ 1. AUTENTICACIÓN ============ -->
       <section v-if="!usuarioLogueado" class="auth-section">
-        <div class="auth-card">
-          <div class="tabs" role="tablist">
-            <button
-              role="tab"
-              @click="cambiarVista('login')"
-              :class="{ active: vistaAuth === 'login' }"
-            >Iniciar sesión</button>
-            <button
-              role="tab"
-              @click="cambiarVista('registro')"
-              :class="{ active: vistaAuth === 'registro' }"
-            >Crear cuenta</button>
+        <div class="auth-wrap">
+          <div class="auth-intro">
+            <h2>Tu barbería, a un clic</h2>
+            <p>Ingresa para gestionar tu cuenta y tus citas.</p>
           </div>
 
-          <form v-if="vistaAuth === 'login'" @submit.prevent="login" class="form">
-            <h2>Bienvenido de nuevo</h2>
-            <p v-if="mensaje.texto" :class="['alert', mensaje.tipo]" role="alert">{{ mensaje.texto }}</p>
-            <div class="form-group">
-              <label for="login-correo">Correo electrónico o teléfono</label>
-              <input id="login-correo" type="text" v-model="formAuth.correo" placeholder="ejemplo@correo.com o 3001234567" required>
+          <div class="auth-card">
+            <!-- Pestañas: iniciar sesión / crear cuenta -->
+            <div class="tabs" role="tablist">
+              <button
+                type="button"
+                role="tab"
+                :class="{ active: vistaAuth === 'login' }"
+                @click="cambiarVista('login')"
+              >Iniciar sesión</button>
+              <button
+                type="button"
+                role="tab"
+                :class="{ active: vistaAuth === 'registro' }"
+                @click="cambiarVista('registro')"
+              >Crear cuenta</button>
             </div>
-            <div class="form-group">
-              <label for="login-pass">Contraseña</label>
-              <input id="login-pass" type="password" v-model="formAuth.password" placeholder="••••••••" required>
-            </div>
-            <button type="submit" class="btn btn-primary btn-block">Ingresar</button>
-          </form>
 
-          <form v-else @submit.prevent="ejecutarCrearCliente" class="form" novalidate>
-            <h2>Crea tu cuenta de cliente</h2>
-            <p v-if="mensaje.texto" :class="['alert', mensaje.tipo]" role="alert">{{ mensaje.texto }}</p>
-            <div class="form-row">
-              <div class="form-group">
-                <label for="reg-nombre">Nombre completo</label>
-                <input id="reg-nombre" type="text" v-model="formRegistro.nombre" placeholder="Tu nombre" required>
+            <!-- Formulario de inicio de sesión (correo o teléfono + contraseña) -->
+            <!--
+              Los formularios usan "novalidate": la validación la hace nuestro código
+              y cada error aparece debajo del campo que lo causó.
+            -->
+            <form v-if="vistaAuth === 'login'" class="form" novalidate @submit.prevent="login">
+              <h2>Bienvenido de nuevo</h2>
+              <!-- Aviso de éxito (por ejemplo, después de crear la cuenta) -->
+              <p v-if="mensajeExito" class="alert exito" role="status">{{ mensajeExito }}</p>
+
+              <CampoForm
+                id="login-correo"
+                label="Correo electrónico o teléfono"
+                v-model="formAuth.correo"
+                :error="errores.correo"
+                autocomplete="username"
+                placeholder="ejemplo@gmail.com o 3001234567"
+              />
+              <CampoForm
+                id="login-pass"
+                label="Contraseña"
+                type="password"
+                v-model="formAuth.password"
+                :error="errores.password"
+                autocomplete="current-password"
+                placeholder="Tu contraseña"
+              />
+
+              <!-- Error del servidor (credenciales incorrectas, cuenta inactiva, sin conexión...) -->
+              <p v-if="errores.general" class="form-error" role="alert">{{ errores.general }}</p>
+              <button type="submit" class="btn btn-primary btn-block" :disabled="enviando">
+                {{ enviando ? 'Ingresando...' : 'Ingresar' }}
+              </button>
+            </form>
+
+            <!-- Formulario de registro de un nuevo cliente -->
+            <form v-else class="form" novalidate @submit.prevent="registrarse">
+              <h2>Crea tu cuenta de cliente</h2>
+
+              <div class="form-row">
+                <CampoForm id="reg-nombre" label="Nombre completo" v-model="formRegistro.nombre" :error="errores.nombre" autocomplete="name" placeholder="Tu nombre" />
+                <CampoForm id="reg-tel" label="Teléfono" type="tel" inputmode="numeric" v-model="formRegistro.telefono" :error="errores.telefono" autocomplete="tel" placeholder="Número de celular" />
               </div>
-              <div class="form-group">
-                <label for="reg-tel">Teléfono</label>
-                <input id="reg-tel" type="text" v-model="formRegistro.telefono" placeholder="Número de celular" required>
+              <CampoForm id="reg-correo" label="Correo electrónico" type="email" v-model="formRegistro.correo" :error="errores.correo" autocomplete="email" placeholder="correo@gmail.com" />
+              <div class="form-row">
+                <CampoForm id="reg-pass" label="Contraseña" type="password" v-model="formRegistro.password" :error="errores.password" autocomplete="new-password" placeholder="6 números" />
+                <CampoForm id="reg-pass2" label="Confirmar contraseña" type="password" v-model="formRegistro.confirmarPassword" :error="errores.confirmarPassword" autocomplete="new-password" placeholder="Repite la contraseña" />
               </div>
-            </div>
-            <div class="form-group">
-              <label for="reg-correo">Correo electrónico</label>
-              <input id="reg-correo" type="email" v-model="formRegistro.correo" placeholder="correo@ejemplo.com" required>
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label for="reg-pass">Contraseña</label>
-                <input id="reg-pass" type="password" v-model="formRegistro.password" placeholder="Mínimo 6 caracteres" required>
-              </div>
-              <div class="form-group">
-                <label for="reg-pass2">Confirmar contraseña</label>
-                <input id="reg-pass2" type="password" v-model="formRegistro.confirmarPassword" placeholder="Repite la contraseña" required>
-              </div>
-            </div>
-            <button type="submit" class="btn btn-primary btn-block" :disabled="enviando">
-              {{ enviando ? 'Creando cuenta...' : 'Crear cuenta' }}
-            </button>
-          </form>
+
+              <p v-if="errores.general" class="form-error" role="alert">{{ errores.general }}</p>
+              <button type="submit" class="btn btn-primary btn-block" :disabled="enviando">
+                {{ enviando ? 'Creando cuenta...' : 'Crear cuenta' }}
+              </button>
+            </form>
+          </div>
         </div>
       </section>
 
       <!-- ============ CONTENIDO CON SESIÓN ============ -->
       <section v-else class="content-section">
-        <!-- Cliente -->
+        <!-- 2. Vista de Cliente -->
         <div v-if="rolActivo === 'Cliente'" class="client-view">
           <div class="card welcome-card">
             <h2>¡Hola, {{ usuarioLogueado.nombre }}!</h2>
@@ -120,10 +148,8 @@
           <p class="hint">Pronto podrás agendar tus citas desde aquí.</p>
         </div>
 
-        <div
-          v-else-if="rolActivo === 'Administrador' && usuarioLogueado.rol !== 'Administrador'"
-          class="card admin-panel"
-        >
+        <!-- Vista previa del panel: un Cliente que pulsó "Cambiar rol" ve la tabla sin poder usarla -->
+        <div v-else-if="!esAdministradorReal" class="card admin-panel">
           <div class="panel-header">
             <h2>Clientes</h2>
             <span class="badge preview">Vista previa</span>
@@ -141,11 +167,11 @@
               </thead>
               <tbody>
                 <tr>
-                  <td>Cliente de ejemplo</td>
-                  <td>—</td>
-                  <td>cliente@ejemplo.com</td>
-                  <td><span class="badge Activo">Activo</span></td>
-                  <td class="col-actions">
+                  <td data-label="Nombre">Cliente de ejemplo</td>
+                  <td data-label="Teléfono">—</td>
+                  <td data-label="Correo" class="cell-email">cliente@ejemplo.com</td>
+                  <td data-label="Estado"><span class="badge Activo">Activo</span></td>
+                  <td data-label="Acciones" class="col-actions">
                     <div class="actions-cell">
                       <button type="button" class="btn btn-sm btn-outline" disabled>Editar</button>
                       <button type="button" class="btn btn-sm btn-outline" disabled>Inactivar</button>
@@ -157,8 +183,8 @@
           </div>
         </div>
 
-        <!-- Administrador -->
-        <div v-else-if="usuarioLogueado.rol === 'Administrador'" class="card admin-panel">
+        <!-- 3. Panel real del Administrador -->
+        <div v-else class="card admin-panel">
           <div class="panel-header">
             <h2>Clientes</h2>
             <div class="panel-actions">
@@ -166,44 +192,32 @@
                 class="search-input"
                 type="search"
                 v-model="criterioBusqueda"
-                @input="ejecutarBuscar"
+                @input="buscarConRetraso"
                 placeholder="Buscar por nombre, teléfono o correo"
               >
-              <button class="btn btn-primary" @click="alternarFormNuevo">
+              <button type="button" class="btn btn-primary" @click="alternarFormNuevo">
                 {{ mostrarFormNuevo ? 'Cerrar' : '+ Nuevo cliente' }}
               </button>
             </div>
           </div>
 
+          <!-- Mensaje general del panel (se oculta mientras el formulario nuevo muestra el suyo) -->
           <p v-if="!mostrarFormNuevo && mensajeAdmin.texto" :class="['alert', mensajeAdmin.tipo]" role="alert">{{ mensajeAdmin.texto }}</p>
 
-          <form v-if="mostrarFormNuevo" @submit.prevent="ejecutarCrearClienteAdmin" class="new-client-form" novalidate>
+          <!-- Formulario para que el administrador cree un cliente -->
+          <form v-if="mostrarFormNuevo" class="new-client-form" novalidate @submit.prevent="crearClienteAdmin">
             <h3>Nuevo cliente</h3>
-            <p v-if="mensajeAdmin.texto" :class="['alert', mensajeAdmin.tipo]" role="alert">{{ mensajeAdmin.texto }}</p>
             <div class="form-row">
-              <div class="form-group">
-                <label for="adm-nombre">Nombre completo</label>
-                <input id="adm-nombre" type="text" v-model="formNuevo.nombre" placeholder="Nombre del cliente" required>
-              </div>
-              <div class="form-group">
-                <label for="adm-tel">Teléfono</label>
-                <input id="adm-tel" type="text" v-model="formNuevo.telefono" placeholder="Número de celular" required>
-              </div>
+              <CampoForm id="adm-nombre" label="Nombre completo" v-model="formNuevo.nombre" :error="erroresNuevo.nombre" placeholder="Nombre del cliente" />
+              <CampoForm id="adm-tel" label="Teléfono" type="tel" inputmode="numeric" v-model="formNuevo.telefono" :error="erroresNuevo.telefono" placeholder="Número de celular" />
             </div>
-            <div class="form-group">
-              <label for="adm-correo">Correo electrónico</label>
-              <input id="adm-correo" type="email" v-model="formNuevo.correo" placeholder="correo@ejemplo.com" required>
-            </div>
+            <CampoForm id="adm-correo" label="Correo electrónico" type="email" v-model="formNuevo.correo" :error="erroresNuevo.correo" placeholder="correo@gmail.com" />
             <div class="form-row">
-              <div class="form-group">
-                <label for="adm-pass">Contraseña</label>
-                <input id="adm-pass" type="password" v-model="formNuevo.password" placeholder="Mínimo 6 caracteres" required>
-              </div>
-              <div class="form-group">
-                <label for="adm-pass2">Confirmar contraseña</label>
-                <input id="adm-pass2" type="password" v-model="formNuevo.confirmarPassword" placeholder="Repite la contraseña" required>
-              </div>
+              <CampoForm id="adm-pass" label="Contraseña" type="password" v-model="formNuevo.password" :error="erroresNuevo.password" autocomplete="new-password" placeholder="6 números" />
+              <CampoForm id="adm-pass2" label="Confirmar contraseña" type="password" v-model="formNuevo.confirmarPassword" :error="erroresNuevo.confirmarPassword" autocomplete="new-password" placeholder="Repite la contraseña" />
             </div>
+
+            <p v-if="erroresNuevo.general" class="form-error" role="alert">{{ erroresNuevo.general }}</p>
             <div class="form-actions">
               <button type="button" class="btn btn-outline" @click="alternarFormNuevo">Cancelar</button>
               <button type="submit" class="btn btn-primary" :disabled="enviandoAdmin">
@@ -212,15 +226,13 @@
             </div>
           </form>
 
+          <!--
+            Tabla de clientes. En pantallas grandes es una tabla normal; en celular
+            cada fila se muestra como una tarjeta (el atributo data-label da el título
+            de cada dato, ver los estilos "Responsive" al final).
+          -->
           <div class="table-wrap">
             <table class="data-table">
-              <colgroup>
-                <col style="width: 24%">
-                <col style="width: 16%">
-                <col style="width: 28%">
-                <col style="width: 12%">
-                <col style="width: 20%">
-              </colgroup>
               <thead>
                 <tr>
                   <th>Nombre</th>
@@ -231,29 +243,35 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="cliente in listaClientes" :key="cliente.correo">
-                  <td>
-                    <input v-if="clienteEditando?.correo === cliente.correo" type="text" v-model="clienteEditando.nombre" class="table-input">
+                <tr v-for="cliente in listaClientes" :key="cliente.id_usuario">
+                  <td data-label="Nombre">
+                    <input v-if="estaEditando(cliente)" type="text" v-model="clienteEditando.nombre" class="table-input">
                     <span v-else>{{ cliente.nombre }}</span>
                   </td>
-                  <td>
-                    <input v-if="clienteEditando?.correo === cliente.correo" type="text" v-model="clienteEditando.telefono" class="table-input">
+                  <td data-label="Teléfono">
+                    <input v-if="estaEditando(cliente)" type="tel" inputmode="numeric" v-model="clienteEditando.telefono" class="table-input">
                     <span v-else>{{ cliente.telefono }}</span>
                   </td>
-                  <td class="cell-email">{{ cliente.correo }}</td>
-                  <td>
+                  <td data-label="Correo" class="cell-email">{{ cliente.correo }}</td>
+                  <td data-label="Estado">
                     <span :class="['badge', cliente.estado]">{{ cliente.estado }}</span>
                   </td>
-                  <td class="col-actions">
-                    <div v-if="clienteEditando?.correo === cliente.correo" class="actions-cell">
-                      <button @click="ejecutarActualizar" class="btn btn-sm btn-primary">Guardar</button>
-                      <button @click="clienteEditando = null" class="btn btn-sm btn-outline">Cancelar</button>
-                    </div>
+                  <td data-label="Acciones" class="col-actions">
+                    <!-- Modo edición: error (si lo hay) debajo de los campos, y botones guardar / cancelar -->
+                    <template v-if="estaEditando(cliente)">
+                      <p v-if="errorEdicion" class="field-error" role="alert">{{ errorEdicion }}</p>
+                      <div class="actions-cell">
+                        <button type="button" class="btn btn-sm btn-primary" @click="guardarEdicion">Guardar</button>
+                        <button type="button" class="btn btn-sm btn-outline" @click="cancelarEdicion">Cancelar</button>
+                      </div>
+                    </template>
+                    <!-- Modo normal: editar o activar/inactivar -->
                     <div v-else class="actions-cell">
-                      <button @click="clienteEditando = { ...cliente }" class="btn btn-sm btn-outline">Editar</button>
+                      <button type="button" class="btn btn-sm btn-outline" @click="editarCliente(cliente)">Editar</button>
                       <button
-                        @click="ejecutarCambioEstado(cliente)"
+                        type="button"
                         :class="['btn', 'btn-sm', cliente.estado === 'Activo' ? 'btn-danger' : 'btn-ok']"
+                        @click="cambiarEstado(cliente)"
                       >{{ cliente.estado === 'Activo' ? 'Inactivar' : 'Activar' }}</button>
                     </div>
                   </td>
@@ -271,242 +289,310 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
-import { ClienteController } from './controllers/ClienteController.js';
+import { ref, computed } from 'vue';
+import CampoForm from './components/CampoForm.vue';
+import { ClienteController, validarLogin, validarRegistro } from './controllers/ClienteController.js';
 
-// Instanciamos el controlador del esquema de clases
+// El controlador es el único que habla con el backend.
+// Sus métodos devuelven el dato pedido, o un texto "Error: ..." si algo falló.
 const controlador = new ClienteController();
 
-// Variables de estado global de la interfaz
-const vistaAuth = ref('login');
-const usuarioLogueado = ref(null);
-const rolVista = ref(null);
+// =====================================================
+// UTILIDADES
+// =====================================================
+
+const MENSAJE_VACIO = { tipo: '', texto: '' };
+
+// Formulario de cliente en blanco (lo usan el registro y el panel de administrador)
+const formVacio = () => ({ nombre: '', telefono: '', correo: '', password: '', confirmarPassword: '' });
+
+// El controlador avisa los errores con un texto que empieza por "Error:".
+const esError = (respuesta) => typeof respuesta === 'string';
+const quitarPrefijoError = (texto) => texto.replace(/^Error:\s*/, '');
+
+const hayErrores = (errores) => Object.keys(errores).length > 0;
+
+// Convierte el error que devolvió el servidor en un objeto de errores por campo.
+// Si el texto habla del correo o del teléfono, aparece debajo de ese campo;
+// en cualquier otro caso va en "general" (se muestra encima del botón).
+const errorDelServidor = (respuesta) => {
+  const texto = quitarPrefijoError(respuesta);
+  if (/correo/i.test(texto)) return { correo: texto };
+  if (/tel[eé]fono/i.test(texto)) return { telefono: texto };
+  return { general: texto };
+};
+
+// Valida el formulario de un cliente nuevo: reglas del controlador + confirmación de contraseña
+const validarFormularioCliente = (f) => {
+  const errores = validarRegistro(f);
+
+  if (!f.confirmarPassword) {
+    errores.confirmarPassword = 'Escribe de nuevo la contraseña para confirmarla.';
+  } else if (f.password !== f.confirmarPassword) {
+    errores.confirmarPassword = 'Las contraseñas no coinciden.';
+  }
+
+  return errores;
+};
+
+// =====================================================
+// ESTADO
+// =====================================================
+
+// --- Sesión ---
+const usuarioLogueado = ref(null);   // Datos del usuario que inició sesión (o null)
+const rolVista = ref(null);          // Rol elegido en "Cambiar rol" (null = usar el rol real)
 const rolActivo = computed(() => rolVista.value || usuarioLogueado.value?.rol);
-const criterioBusqueda = ref('');
+const esAdministradorReal = computed(() => usuarioLogueado.value?.rol === 'Administrador');
+
+// --- Autenticación (login / registro) ---
+const vistaAuth = ref('login');                // 'login' | 'registro'
+const formAuth = ref({ correo: '', password: '' });   // "correo" admite correo o teléfono
+const formRegistro = ref(formVacio());
+const errores = ref({});                       // Errores del formulario visible: { campo: 'texto' } (+ "general")
+const mensajeExito = ref('');                  // Aviso de éxito mostrado en el login
+const enviando = ref(false);                   // Evita envíos dobles mientras se espera al servidor
+
+// --- Panel de administrador ---
 const listaClientes = ref([]);
-const clienteEditando = ref(null);
+const criterioBusqueda = ref('');
+const clienteEditando = ref(null);             // Copia del cliente que se está editando en la tabla
+const errorEdicion = ref('');                  // Error mostrado bajo la fila que se está editando
+const formNuevo = ref(formVacio());
+const erroresNuevo = ref({});                  // Errores del formulario "Nuevo cliente"
+const mostrarFormNuevo = ref(false);
+const enviandoAdmin = ref(false);
+const mensajeAdmin = ref({ ...MENSAJE_VACIO });   // Avisos generales del panel (éxito, o error al buscar / cambiar estado)
 
-const formAuth = ref({ correo: '', password: '' });
-const formRegistro = ref({ nombre: '', telefono: '', correo: '', password: '', confirmarPassword: '' });
-const mensaje = ref({ tipo: '', texto: '' });
-const enviando = ref(false);
+// =====================================================
+// AUTENTICACIÓN
+// =====================================================
 
+// Cambia entre las pestañas "Iniciar sesión" y "Crear cuenta"
 const cambiarVista = (vista) => {
   vistaAuth.value = vista;
-  mensaje.value = { tipo: '', texto: '' };
+  errores.value = {};
+  mensajeExito.value = '';
 };
 
-const cambiarRolVista = (rol) => {
-  rolVista.value = rol;
-};
+// Inicia sesión con correo o teléfono + contraseña
+const login = async () => {
+  mensajeExito.value = '';
+  errores.value = validarLogin(formAuth.value);
+  if (hayErrores(errores.value)) return;   // Los errores ya quedaron bajo cada campo
 
-// Validaciones del registro (el backend vuelve a validar: esto es solo para dar respuesta rápida)
-const validarRegistro = (f) => {
-  if (!f.nombre.trim() || !f.telefono.trim() || !f.correo.trim() || !f.password || !f.confirmarPassword) {
-    return 'Completa todos los campos obligatorios.';
-  }
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.correo.trim())) {
-    return 'El correo electrónico no tiene un formato válido.';
-  }
-  if (f.password.length < 6) {
-    return 'La contraseña debe tener al menos 6 caracteres.';
-  }
-  if (f.password !== f.confirmarPassword) {
-    return 'Las contraseñas no coinciden.';
-  }
-  return null;
-};
+  enviando.value = true;
+  const respuesta = await controlador.iniciarSesion(formAuth.value);
+  enviando.value = false;
 
-onMounted(() => {
-  ejecutarBuscar(); // Carga los clientes predeterminados al iniciar la pantalla
-});
-
-// Función para registrar clientes (Flujo de secuencia de creación)
-const ejecutarCrearCliente = async () => {
-  const f = formRegistro.value;
-
-  const errorValidacion = validarRegistro(f);
-  if (errorValidacion) {
-    mensaje.value = { tipo: 'error', texto: errorValidacion };
+  if (esError(respuesta)) {
+    // Credenciales incorrectas, cuenta inactiva, sin conexión...: se muestra encima del botón
+    errores.value = { general: quitarPrefijoError(respuesta) };
     return;
   }
 
-  enviando.value = true;
-  mensaje.value = { tipo: '', texto: '' };
+  usuarioLogueado.value = respuesta;
+  rolVista.value = null;
+  errores.value = {};
+  formAuth.value = { correo: '', password: '' };
 
-  try {
-    // Solo se envían los datos personales: el rol y el estado los asigna el backend
-    const respuesta = await controlador.crearCliente({
-      nombre: f.nombre.trim(),
-      telefono: f.telefono.trim(),
-      correo: f.correo.trim(),
-      password: f.password
-    });
-
-    if (typeof respuesta === 'string') {
-      mensaje.value = { tipo: 'error', texto: respuesta.replace(/^Error:\s*/, '') };
-      return;
-    }
-
-    formRegistro.value = { nombre: '', telefono: '', correo: '', password: '', confirmarPassword: '' };
-    vistaAuth.value = 'login';
-    mensaje.value = { tipo: 'exito', texto: 'Cuenta creada correctamente. Ya puedes iniciar sesión.' };
-  } catch (error) {
-    mensaje.value = { tipo: 'error', texto: 'No se pudo conectar con el servidor. Inténtalo de nuevo en unos minutos.' };
-  } finally {
-    enviando.value = false;
+  // Solo el administrador necesita la lista de clientes
+  if (esAdministradorReal.value) {
+    await buscarClientes();
   }
 };
 
-// El administrador crea un cliente (usa la misma ruta y validaciones que el registro público;
-// el backend siempre asigna rol Cliente y estado Activo)
-const formVacio = () => ({ nombre: '', telefono: '', correo: '', password: '', confirmarPassword: '' });
-const formNuevo = ref(formVacio());
-const mostrarFormNuevo = ref(false);
-const enviandoAdmin = ref(false);
-const mensajeAdmin = ref({ tipo: '', texto: '' });
+// Cierra la sesión y limpia todo lo relacionado con el usuario
+const logout = () => {
+  usuarioLogueado.value = null;
+  rolVista.value = null;
+  mostrarFormNuevo.value = false;
+  clienteEditando.value = null;
+  listaClientes.value = [];
+  criterioBusqueda.value = '';
+  mensajeAdmin.value = { ...MENSAJE_VACIO };
+  errores.value = {};
+  mensajeExito.value = '';
+};
 
+// =====================================================
+// CREACIÓN DE CLIENTES (registro público y panel de administrador)
+// =====================================================
+
+// Valida y envía un formulario de cliente. Lo comparten el registro y el panel de administrador.
+// Devuelve { cliente } si se creó, o { errores } con los mensajes por campo.
+const enviarNuevoCliente = async (f) => {
+  const erroresForm = validarFormularioCliente(f);
+  if (hayErrores(erroresForm)) return { errores: erroresForm };
+
+  // Solo se envían los datos personales: el rol y el estado los asigna el backend
+  const respuesta = await controlador.crearCliente({
+    nombre: f.nombre.trim(),
+    telefono: f.telefono.trim(),
+    correo: f.correo.trim(),
+    password: f.password
+  });
+
+  if (esError(respuesta)) return { errores: errorDelServidor(respuesta) };
+  return { cliente: respuesta };
+};
+
+// Registro público: crea la cuenta y lleva al usuario a la pestaña de login
+const registrarse = async () => {
+  enviando.value = true;
+  errores.value = {};
+
+  const resultado = await enviarNuevoCliente(formRegistro.value);
+  enviando.value = false;
+
+  if (resultado.errores) {
+    errores.value = resultado.errores;
+    return;
+  }
+
+  formRegistro.value = formVacio();
+  vistaAuth.value = 'login';
+  mensajeExito.value = 'Cuenta creada correctamente. Ya puedes iniciar sesión.';
+};
+
+// Muestra u oculta el formulario "Nuevo cliente" (siempre lo deja limpio)
 const alternarFormNuevo = () => {
   mostrarFormNuevo.value = !mostrarFormNuevo.value;
   formNuevo.value = formVacio();
-  mensajeAdmin.value = { tipo: '', texto: '' };
+  erroresNuevo.value = {};
+  mensajeAdmin.value = { ...MENSAJE_VACIO };
 };
 
-const ejecutarCrearClienteAdmin = async () => {
-  const f = formNuevo.value;
+// El administrador crea un cliente con las mismas validaciones que el registro público
+const crearClienteAdmin = async () => {
+  enviandoAdmin.value = true;
+  erroresNuevo.value = {};
+  mensajeAdmin.value = { ...MENSAJE_VACIO };
 
-  const errorValidacion = validarRegistro(f);
-  if (errorValidacion) {
-    mensajeAdmin.value = { tipo: 'error', texto: errorValidacion };
+  const { cliente, errores: erroresForm } = await enviarNuevoCliente(formNuevo.value);
+  enviandoAdmin.value = false;
+
+  if (erroresForm) {
+    erroresNuevo.value = erroresForm;
     return;
   }
 
-  enviandoAdmin.value = true;
-  mensajeAdmin.value = { tipo: '', texto: '' };
-
-  try {
-    const respuesta = await controlador.crearCliente({
-      nombre: f.nombre.trim(),
-      telefono: f.telefono.trim(),
-      correo: f.correo.trim(),
-      password: f.password
-    });
-
-    if (typeof respuesta === 'string') {
-      mensajeAdmin.value = { tipo: 'error', texto: respuesta.replace(/^Error:\s*/, '') };
-      return;
-    }
-
-    formNuevo.value = formVacio();
-    mostrarFormNuevo.value = false;
-    mensajeAdmin.value = { tipo: 'exito', texto: `Cliente "${respuesta.nombre}" creado correctamente.` };
-    await ejecutarBuscar();
-  } catch (error) {
-    mensajeAdmin.value = { tipo: 'error', texto: 'No se pudo conectar con el servidor. Inténtalo de nuevo en unos minutos.' };
-  } finally {
-    enviandoAdmin.value = false;
-  }
+  formNuevo.value = formVacio();
+  mostrarFormNuevo.value = false;
+  mensajeAdmin.value = { tipo: 'exito', texto: `Cliente "${cliente.nombre}" creado correctamente.` };
+  await buscarClientes();
 };
 
-// Función para buscar en tiempo real (Flujo de secuencia de búsqueda)
-const ejecutarBuscar = async () => {
+// =====================================================
+// PANEL DE ADMINISTRADOR: buscar, editar y cambiar estado
+// =====================================================
+
+// Pide al backend los clientes que coinciden con el texto del buscador
+const buscarClientes = async () => {
   const respuesta = await controlador.buscarCliente(criterioBusqueda.value);
 
-  console.log('Respuesta de búsqueda:', respuesta);
-
-  if (typeof respuesta === 'string') {
-    console.error(respuesta);
+  if (esError(respuesta)) {
+    mensajeAdmin.value = { tipo: 'error', texto: quitarPrefijoError(respuesta) };
     return;
   }
 
   listaClientes.value = respuesta;
 };
 
-// Función para guardar actualizaciones físicas de campos (Flujo de secuencia de actualización)
-const ejecutarActualizar = async () => {
-  const respuesta = await controlador.actualizarCliente(
-    clienteEditando.value
-  );
+// Busca mientras se escribe, pero espera 300 ms sin teclear para no saturar el servidor
+let temporizadorBusqueda;
+const buscarConRetraso = () => {
+  clearTimeout(temporizadorBusqueda);
+  temporizadorBusqueda = setTimeout(buscarClientes, 300);
+};
 
-  if (typeof respuesta === 'string') {
-    alert(respuesta);
+// ¿Es esta la fila que se está editando?
+const estaEditando = (cliente) => clienteEditando.value?.id_usuario === cliente.id_usuario;
+
+// Pone una fila en modo edición (trabaja sobre una copia, así "Cancelar" no deja cambios)
+const editarCliente = (cliente) => {
+  clienteEditando.value = { ...cliente };
+  errorEdicion.value = '';
+  mensajeAdmin.value = { ...MENSAJE_VACIO };
+};
+
+const cancelarEdicion = () => {
+  clienteEditando.value = null;
+  errorEdicion.value = '';
+};
+
+// Guarda el nombre y teléfono editados en la tabla.
+// Si algo falla, el error aparece debajo de la fila que se está editando.
+const guardarEdicion = async () => {
+  const { nombre, telefono } = clienteEditando.value;
+
+  if (!nombre.trim()) {
+    errorEdicion.value = 'El nombre no puede estar vacío.';
+    return;
+  }
+  if (!/^\d+$/.test(telefono.trim())) {
+    errorEdicion.value = 'El teléfono solo puede tener números, sin espacios ni guiones.';
     return;
   }
 
-  alert('Cliente actualizado correctamente');
+  const respuesta = await controlador.actualizarCliente(clienteEditando.value);
 
-  clienteEditando.value = null;
+  if (esError(respuesta)) {
+    errorEdicion.value = quitarPrefijoError(respuesta);
+    return;
+  }
 
-  await ejecutarBuscar();
+  cancelarEdicion();
+  mensajeAdmin.value = { tipo: 'exito', texto: 'Cliente actualizado correctamente.' };
+  await buscarClientes();
 };
 
-// Función para la actualización del Estado (Solicitado por el profe en lugar del Delete)
-const ejecutarCambioEstado = async (cliente) => {
-  const nuevoEstado = cliente.estado === 'Activo'
-    ? 'Inactivo'
-    : 'Activo';
+// Activa o inactiva un cliente (en lugar de eliminarlo, así se conserva su historial)
+const cambiarEstado = async (cliente) => {
+  const nuevoEstado = cliente.estado === 'Activo' ? 'Inactivo' : 'Activo';
 
   const respuesta = await controlador.cambiarEstadoCliente({
     id_usuario: cliente.id_usuario,
     estado: nuevoEstado
   });
 
-  if (typeof respuesta === 'string') {
-    alert(respuesta);
+  if (esError(respuesta)) {
+    mensajeAdmin.value = { tipo: 'error', texto: quitarPrefijoError(respuesta) };
     return;
   }
 
-  alert(`Cliente ${nuevoEstado === 'Activo' ? 'activado' : 'inactivado'} correctamente`);
-
-  await ejecutarBuscar();
-};
-
-// Simulación del proceso de autenticación de credenciales
-const login = async () => {
-  const { correo, password } = formAuth.value;
-
-  const respuesta = await controlador.iniciarSesion({
-    correo,
-    password
-  });
-
-  if (typeof respuesta === 'string') {
-    alert(respuesta);
-    return;
-  }
-
-  usuarioLogueado.value = respuesta;
-  rolVista.value = null;
-
-  formAuth.value = {
-    correo: '',
-    password: ''
+  mensajeAdmin.value = {
+    tipo: 'exito',
+    texto: `Cliente ${nuevoEstado === 'Activo' ? 'activado' : 'inactivado'} correctamente.`
   };
-};
-
-const logout = () => {
-  usuarioLogueado.value = null;
-  rolVista.value = null;
-  mostrarFormNuevo.value = false;
-  mensajeAdmin.value = { tipo: '', texto: '' };
-  formAuth.value = { correo: '', password: '' };
+  await buscarClientes();
 };
 </script>
 
 <style scoped>
-/* ---------- Tokens ---------- */
+/*
+  Estilos de la aplicación — enfoque "mobile first":
+  las reglas base están pensadas para celular y los @media del final
+  (min-width) agregan lo necesario para tabletas y computadores.
+*/
+
+/* ---------- Colores y medidas reutilizables ---------- */
 .app {
-  --bg: #f4f5f7;
-  --surface: #ffffff;
-  --ink: #16213a;          /* azul marino */
-  --text: #232a3b;
-  --muted: #6a7285;
-  --line: #e1e4ea;
-  --red: #b3262e;          /* rojo poste de barbero */
-  --red-dark: #8f1d24;
+  --bg: #f6f1e9;           /* crema (fondo general) */
+  --surface: #fffdf9;      /* fondo de tarjetas */
+  --ink: #1f1d1b;          /* carbón (encabezado y títulos) */
+  --text: #2b2825;
+  --muted: #7a7268;
+  --line: #e6dccd;         /* bordes suaves */
+  --sand: #f7f1e7;         /* fondo de pestañas, encabezado de tabla */
+  --gold: #b08d57;
+  --red: #a4262c;          /* rojo poste de barbero (acción principal) */
+  --red-dark: #831c21;
   --green: #1f7a4d;
   --radius: 10px;
-  --gap: 24px;
+  --gap: 16px;
+  --serif: Georgia, 'Times New Roman', serif;
+  --touch: 44px;           /* alto mínimo cómodo para tocar con el dedo */
 
   min-height: 100vh;
   background: var(--bg);
@@ -514,75 +600,83 @@ const logout = () => {
   font-family: 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif;
   line-height: 1.5;
 }
-.app *, .app *::before, .app *::after { box-sizing: border-box; }
+.app h1, .app h2, .app h3 { margin: 0; font-family: var(--serif); font-weight: 700; color: var(--ink); }
+.app p { margin: 0; }
 
-/* ---------- Header (franja de poste de barbero) ---------- */
+/* ---------- Encabezado (franja de poste de barbero) ---------- */
 .app-header {
   background: var(--ink);
   color: #fff;
   border-top: 6px solid transparent;
   border-image: repeating-linear-gradient(
     135deg, var(--red) 0 14px, #fff 14px 28px, #2c4a8a 28px 42px
-  ) 6;
+  ) 6 0 0 0;
+  box-shadow: 0 2px 0 var(--gold);
 }
 .header-inner {
-  width: 100%;
-  padding: 16px 40px;
   display: flex;
+  flex-wrap: wrap;               /* en celular la sesión baja a otra línea si no cabe */
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 12px;
+  padding: 12px 16px;
 }
-.brand { font-size: 1.35rem; font-weight: 700; letter-spacing: .3px; }
-.session-area { display: flex; align-items: center; gap: 16px; }
-.session-text { display: flex; flex-direction: column; text-align: right; line-height: 1.2; }
-.session-text small { color: #b9c0d0; }
-.role-switch { position: relative; }
-.role-switch summary { cursor: pointer; font-weight: 600; }
-.role-switch summary:focus-visible { outline: 2px solid var(--red); outline-offset: 4px; }
+/* Se escribe con .app-header para ganarle a ".app h1" (que pinta los títulos en carbón) */
+.app-header .brand { font-size: 1.35rem; letter-spacing: 1px; color: #fff; }
+
+.session-area { position: relative; display: flex; align-items: center; gap: 12px; }
+.session-text { display: none; flex-direction: column; text-align: right; line-height: 1.2; }
+.session-text small { color: var(--gold); }
+
+/* Menú "Cambiar rol": se ancla al área de sesión para no salirse de la pantalla */
+.role-switch summary { display: flex; align-items: center; min-height: var(--touch); cursor: pointer; font-weight: 600; }
+.role-switch summary:focus-visible { outline: 2px solid var(--gold); outline-offset: 4px; }
 .role-switch-menu {
   position: absolute;
   z-index: 1;
-  top: calc(100% + 12px);
+  top: calc(100% + 8px);
   right: 0;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  width: 260px;
+  width: min(260px, calc(100vw - 32px));
   padding: 16px;
   color: var(--text);
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(22, 33, 58, .16);
+  box-shadow: 0 8px 24px rgba(31, 29, 27, .18);
 }
-.role-switch-menu p { margin: 0; }
 
-/* ---------- Layout ---------- */
-.main { width: 100%; padding: 40px; }
-.auth-section { display: flex; justify-content: center; }
-.auth-card {
-  width: 100%;
-  max-width: 460px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  overflow: hidden;
-}
+/* ---------- Estructura general ---------- */
+.main { padding: 20px 16px; }
 .card {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
+  box-shadow: 0 2px 8px rgba(31, 29, 27, .04);
   padding: var(--gap);
 }
-.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--gap); }
-.client-view { display: flex; flex-direction: column; gap: var(--gap); width: 100%; }
 
-/* ---------- Tabs ---------- */
+/* ---------- Autenticación ---------- */
+.auth-wrap { width: 100%; max-width: 460px; margin: 0 auto; }
+.auth-intro { text-align: center; margin-bottom: 16px; }
+.auth-intro h2 { margin-bottom: 4px; font-size: 1.5rem; }
+.auth-intro p { color: var(--muted); }
+.auth-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-top: 3px solid var(--gold);
+  border-radius: var(--radius);
+  box-shadow: 0 10px 30px rgba(31, 29, 27, .08);
+  overflow: hidden;
+}
+
 .tabs { display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid var(--line); }
 .tabs button {
-  padding: 16px;
-  background: #f8f9fb;
+  min-height: var(--touch);
+  padding: 12px 8px;
+  background: var(--sand);
   border: 0;
   border-bottom: 3px solid transparent;
   font-size: 1rem;
@@ -594,76 +688,79 @@ const logout = () => {
 .tabs button:focus-visible { outline: 2px solid var(--red); outline-offset: -2px; }
 
 /* ---------- Formularios ---------- */
-.form { padding: 32px; display: flex; flex-direction: column; gap: 18px; }
-.form h2 { font-size: 1.3rem; color: var(--ink); }
-.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-.form-group { display: flex; flex-direction: column; gap: 6px; }
-.form-group label { font-size: .9rem; font-weight: 600; color: var(--ink); }
-.form-group input,
+.form { display: flex; flex-direction: column; gap: 16px; padding: 20px 16px; }
+.form h2 { font-size: 1.25rem; }
+.form-row { display: grid; grid-template-columns: 1fr; gap: 16px; }   /* 1 columna en celular */
+
+/* Los campos de los formularios están en components/CampoForm.vue.
+   Aquí solo se estilan el buscador y los campos de la tabla.
+   font-size 16px evita que el iPhone haga zoom automático al tocar un campo */
 .search-input,
 .table-input {
   width: 100%;
-  padding: 11px 12px;
-  border: 1px solid #c9ced8;
+  min-height: var(--touch);
+  padding: 10px 12px;
+  border: 1px solid #d6cab6;
   border-radius: 8px;
-  font-size: 1rem;
+  font-size: 16px;
   background: #fff;
   color: var(--text);
 }
-.form-group input:focus,
 .search-input:focus,
-.table-input:focus { outline: 2px solid var(--red); outline-offset: 0; border-color: transparent; }
+.table-input:focus { outline: 2px solid var(--gold); border-color: transparent; }
 
 /* ---------- Botones ---------- */
 .btn {
-  padding: 10px 18px;
+  min-height: var(--touch);
+  padding: 10px 16px;
   border: 1px solid transparent;
   border-radius: 8px;
   font-size: .95rem;
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
+  transition: background .15s, color .15s;
 }
-.btn:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
-.btn-block { width: 100%; padding: 12px; font-size: 1rem; }
-.btn-sm { padding: 6px 12px; font-size: .85rem; }
+.btn:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.btn:disabled { opacity: .6; cursor: not-allowed; }
+.btn-block { width: 100%; font-size: 1rem; }
+.btn-sm { padding: 8px 12px; font-size: .9rem; }
+
 .btn-primary { background: var(--red); color: #fff; }
-.btn-primary:hover { background: var(--red-dark); }
-.btn-outline { background: transparent; border-color: #9aa3b8; color: inherit; }
-.btn-outline:hover { background: rgba(120, 130, 160, .12); }
-.table-wrap .btn-outline { border-color: var(--line); color: var(--ink); }
+.btn-primary:hover:not(:disabled) { background: var(--red-dark); }
+.btn-outline { background: transparent; border-color: #8f877b; color: inherit; }
+.btn-outline:hover:not(:disabled) { background: rgba(176, 141, 87, .15); }
+.table-wrap .btn-outline { border-color: #d6cab6; color: var(--ink); }
 .btn-danger { background: #fff; border-color: var(--red); color: var(--red); }
 .btn-danger:hover { background: var(--red); color: #fff; }
 .btn-ok { background: #fff; border-color: var(--green); color: var(--green); }
 .btn-ok:hover { background: var(--green); color: #fff; }
 
-.btn:disabled { opacity: .6; cursor: not-allowed; }
-
 /* ---------- Mensajes ---------- */
+/* Avisos de éxito (y errores generales del panel) */
 .alert { padding: 12px 14px; border-radius: 8px; font-size: .92rem; border: 1px solid transparent; }
 .alert.error { background: #f9e7e8; border-color: #e8bcbf; color: var(--red-dark); }
 .alert.exito { background: #e1f3ea; border-color: #b6dcc8; color: #17623c; }
 
-/* ---------- Cliente ---------- */
-.welcome-card h2 { font-size: 1.6rem; color: var(--ink); margin-bottom: 8px; }
+/* Errores de validación: texto rojo directamente debajo del campo o encima del botón */
+.field-error { font-size: .85rem; line-height: 1.3; color: var(--red-dark); }
+.form-error { padding: 10px 12px; font-size: .9rem; color: var(--red-dark); background: #f9e7e8; border-left: 3px solid var(--red); border-radius: 4px; }
+
+/* ---------- Vista de Cliente ---------- */
+.client-view { display: flex; flex-direction: column; gap: var(--gap); }
+.welcome-card { border-left: 4px solid var(--gold); }
+.welcome-card h2 { margin-bottom: 8px; font-size: 1.4rem; }
+.grid-2 { display: grid; grid-template-columns: 1fr; gap: var(--gap); }
 .muted { color: var(--muted); }
 .label { font-size: .85rem; color: var(--muted); }
 .value { font-size: 1.1rem; font-weight: 600; color: var(--ink); word-break: break-word; }
 .hint { text-align: center; color: var(--muted); }
 
-/* ---------- Admin ---------- */
-.panel-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: var(--gap);
-}
-.panel-header h2 { font-size: 1.4rem; color: var(--ink); }
-.search-input { max-width: 380px; }
-.panel-actions { display: flex; align-items: center; gap: 12px; flex: 1; justify-content: flex-end; }
-.panel-actions .search-input { flex: 1; }
-.panel-actions .btn { flex-shrink: 0; }
+/* ---------- Panel de Administrador ---------- */
+.panel-header { display: flex; flex-direction: column; gap: 12px; margin-bottom: var(--gap); }
+.panel-header h2 { font-size: 1.3rem; }
+.panel-actions { display: flex; flex-direction: column; gap: 12px; }
+.admin-panel > .alert { margin-bottom: var(--gap); }
 
 .new-client-form {
   display: flex;
@@ -671,41 +768,92 @@ const logout = () => {
   gap: 16px;
   padding: var(--gap);
   margin-bottom: var(--gap);
-  background: #f8f9fb;
+  background: var(--sand);
   border: 1px solid var(--line);
   border-radius: var(--radius);
 }
-.new-client-form h3 { font-size: 1.1rem; color: var(--ink); }
-.form-actions { display: flex; justify-content: flex-end; gap: 12px; }
-.admin-panel > .alert { margin-bottom: var(--gap); }
+.new-client-form h3 { font-size: 1.1rem; }
+.form-actions { display: flex; flex-direction: column-reverse; gap: 12px; }
 
-.table-wrap { overflow-x: auto; }
-.data-table { width: 100%; min-width: 760px; border-collapse: collapse; table-layout: fixed; }
-.data-table th,
-.data-table td { padding: 14px 12px; text-align: left; vertical-align: middle; border-bottom: 1px solid var(--line); }
-.data-table th { font-size: .85rem; font-weight: 700; color: var(--muted); background: #f8f9fb; }
-.data-table tbody tr:hover { background: #fafbfc; }
-.cell-email { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.col-actions { text-align: right !important; }
-.actions-cell { display: flex; gap: 8px; justify-content: flex-end; }
-.no-data { text-align: center !important; color: var(--muted); padding: 32px 12px !important; }
+/* ---------- Tabla de clientes ---------- */
+/*
+  En celular (base) la tabla se convierte en una lista de tarjetas:
+  se oculta el encabezado y cada celda muestra su título con data-label.
+*/
+.data-table, .data-table tbody, .data-table tr, .data-table td { display: block; width: 100%; }
+.data-table thead { display: none; }
+.data-table tr { padding: 4px 14px; margin-bottom: 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+.data-table td {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+  text-align: right;
+  word-break: break-word;
+}
+.data-table td:last-child { border-bottom: 0; }
+.data-table td::before {
+  content: attr(data-label);
+  flex-shrink: 0;
+  font-size: .8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: var(--muted);
+  text-align: left;
+}
+.table-input { max-width: 60%; }
+.col-actions { flex-direction: column; align-items: stretch !important; }
+.col-actions::before { display: none; }
+.actions-cell { display: flex; gap: 8px; }
+.actions-cell .btn { flex: 1; }
+.data-table .no-data { display: block; text-align: center; color: var(--muted); padding: 24px 12px; }
+.data-table .no-data::before { display: none; }
 
 .badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: .8rem; font-weight: 700; }
 .badge.Activo { background: #e1f3ea; color: #17623c; }
-.badge.Inactivo { background: #f4e0e1; color: #8f1d24; }
-.badge.preview { background: #eef0f4; color: var(--muted); }
+.badge.Inactivo { background: #f4e0e1; color: #831c21; }
+.badge.preview { background: #efe8da; color: var(--muted); }
 
-/* ---------- Responsive ---------- */
-@media (max-width: 640px) {
-  .main { padding: 24px 16px; }
-  .header-inner { padding: 12px 16px; }
-  .form { padding: 24px 20px; }
-  .form-row, .grid-2 { grid-template-columns: 1fr; }
-  .panel-header { flex-direction: column; align-items: stretch; }
-  .search-input { max-width: none; }
-  .panel-actions { flex-direction: column; align-items: stretch; }
-  .form-actions { flex-direction: column-reverse; }
-  .session-text { display: none; }
-  .role-switch-menu { right: -90px; }
+/* ---------- Tabletas (≥ 640px) ---------- */
+@media (min-width: 640px) {
+  .app { --gap: 24px; }
+  .header-inner { padding: 14px 24px; }
+  .session-text { display: flex; }
+  .main { padding: 32px 24px; }
+  .auth-intro h2 { font-size: 1.8rem; }
+  .form { padding: 32px; }
+  .form-row, .grid-2 { grid-template-columns: 1fr 1fr; }
+  .form-actions { flex-direction: row; justify-content: flex-end; }
+  .panel-header { flex-direction: row; align-items: center; justify-content: space-between; }
+  .panel-actions { flex-direction: row; align-items: center; flex: 1; justify-content: flex-end; }
+  .search-input { max-width: 380px; }
+  .panel-actions .btn { flex-shrink: 0; }
+}
+
+/* ---------- Computador (≥ 900px): la tarjeta vuelve a ser tabla ---------- */
+@media (min-width: 900px) {
+  .header-inner { padding: 14px 40px; }
+  .main { padding: 40px; }
+
+  .table-wrap { overflow-x: auto; }
+  .data-table { display: table; table-layout: fixed; border-collapse: collapse; }
+  .data-table thead { display: table-header-group; }
+  .data-table tbody { display: table-row-group; }
+  .data-table tr { display: table-row; padding: 0; margin: 0; border: 0; border-radius: 0; background: none; }
+  .data-table th,
+  .data-table td { display: table-cell; width: auto; padding: 14px 12px; text-align: left; vertical-align: middle; border-bottom: 1px solid var(--line); }
+  .data-table td::before { display: none; }
+  .data-table th { font-size: .8rem; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--muted); background: var(--sand); }
+  .data-table tbody tr:hover { background: #fbf7f0; }
+  .data-table td:last-child { border-bottom: 1px solid var(--line); }
+  .table-input { max-width: none; }
+  .cell-email { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .col-actions { text-align: right !important; }
+  .actions-cell { justify-content: flex-end; }
+  .actions-cell .btn { flex: none; }
+  .btn-sm { padding: 6px 12px; min-height: 0; }
 }
 </style>
