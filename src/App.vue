@@ -252,7 +252,10 @@
                     <input v-if="estaEditando(cliente)" type="tel" inputmode="numeric" v-model="clienteEditando.telefono" class="table-input">
                     <span v-else>{{ cliente.telefono }}</span>
                   </td>
-                  <td data-label="Correo" class="cell-email">{{ cliente.correo }}</td>
+                  <td data-label="Correo" class="cell-email">
+                    <input v-if="estaEditando(cliente)" type="email" v-model="clienteEditando.correo" class="table-input">
+                    <span v-else>{{ cliente.correo }}</span>
+                  </td>
                   <td data-label="Estado">
                     <span :class="['badge', cliente.estado]">{{ cliente.estado }}</span>
                   </td>
@@ -265,7 +268,15 @@
                         <button type="button" class="btn btn-sm btn-outline" @click="cancelarEdicion">Cancelar</button>
                       </div>
                     </template>
-                    <!-- Modo normal: editar o activar/inactivar -->
+                    <!-- Confirmación antes de eliminar (la acción no se puede deshacer) -->
+                    <template v-else-if="idEliminando === cliente.id_usuario">
+                      <p class="field-error">¿Eliminar a {{ cliente.nombre }}? No se puede deshacer.</p>
+                      <div class="actions-cell">
+                        <button type="button" class="btn btn-sm btn-danger" @click="eliminarCliente(cliente)">Sí, eliminar</button>
+                        <button type="button" class="btn btn-sm btn-outline" @click="idEliminando = null">Cancelar</button>
+                      </div>
+                    </template>
+                    <!-- Modo normal: editar, activar/inactivar o eliminar -->
                     <div v-else class="actions-cell">
                       <button type="button" class="btn btn-sm btn-outline" @click="editarCliente(cliente)">Editar</button>
                       <button
@@ -273,6 +284,7 @@
                         :class="['btn', 'btn-sm', cliente.estado === 'Activo' ? 'btn-danger' : 'btn-ok']"
                         @click="cambiarEstado(cliente)"
                       >{{ cliente.estado === 'Activo' ? 'Inactivar' : 'Activar' }}</button>
+                      <button type="button" class="btn btn-sm btn-danger" @click="pedirConfirmacionEliminar(cliente)">Eliminar</button>
                     </div>
                   </td>
                 </tr>
@@ -358,6 +370,7 @@ const listaClientes = ref([]);
 const criterioBusqueda = ref('');
 const clienteEditando = ref(null);             // Copia del cliente que se está editando en la tabla
 const errorEdicion = ref('');                  // Error mostrado bajo la fila que se está editando
+const idEliminando = ref(null);                // id del cliente que espera confirmación para eliminarse
 const formNuevo = ref(formVacio());
 const erroresNuevo = ref({});                  // Errores del formulario "Nuevo cliente"
 const mostrarFormNuevo = ref(false);
@@ -513,6 +526,7 @@ const estaEditando = (cliente) => clienteEditando.value?.id_usuario === cliente.
 const editarCliente = (cliente) => {
   clienteEditando.value = { ...cliente };
   errorEdicion.value = '';
+  idEliminando.value = null;
   mensajeAdmin.value = { ...MENSAJE_VACIO };
 };
 
@@ -524,14 +538,12 @@ const cancelarEdicion = () => {
 // Guarda el nombre y teléfono editados en la tabla.
 // Si algo falla, el error aparece debajo de la fila que se está editando.
 const guardarEdicion = async () => {
-  const { nombre, telefono } = clienteEditando.value;
+  // Se reutilizan las reglas del registro (la contraseña no se edita aquí, por eso se completa con una válida)
+  const { nombre, telefono, correo } = clienteEditando.value;
+  const erroresFila = validarRegistro({ nombre, telefono, correo, password: '123456' });
 
-  if (!nombre.trim()) {
-    errorEdicion.value = 'El nombre no puede estar vacío.';
-    return;
-  }
-  if (!/^\d+$/.test(telefono.trim())) {
-    errorEdicion.value = 'El teléfono solo puede tener números, sin espacios ni guiones.';
+  if (hayErrores(erroresFila)) {
+    errorEdicion.value = Object.values(erroresFila)[0];
     return;
   }
 
@@ -547,7 +559,28 @@ const guardarEdicion = async () => {
   await buscarClientes();
 };
 
-// Activa o inactiva un cliente (en lugar de eliminarlo, así se conserva su historial)
+// Primer paso para eliminar: muestra "¿Eliminar?" en la fila del cliente
+const pedirConfirmacionEliminar = (cliente) => {
+  idEliminando.value = cliente.id_usuario;
+  mensajeAdmin.value = { ...MENSAJE_VACIO };
+};
+
+// Segundo paso: elimina al cliente de forma definitiva.
+// Si ya tiene registros asociados, el backend lo rechaza y se le sugiere inactivarlo.
+const eliminarCliente = async (cliente) => {
+  const respuesta = await controlador.eliminarCliente({ id_usuario: cliente.id_usuario });
+  idEliminando.value = null;
+
+  if (esError(respuesta)) {
+    mensajeAdmin.value = { tipo: 'error', texto: quitarPrefijoError(respuesta) };
+    return;
+  }
+
+  mensajeAdmin.value = { tipo: 'exito', texto: `Cliente "${cliente.nombre}" eliminado correctamente.` };
+  await buscarClientes();
+};
+
+// Activa o inactiva un cliente (alternativa a eliminar: conserva sus datos e historial)
 const cambiarEstado = async (cliente) => {
   const nuevoEstado = cliente.estado === 'Activo' ? 'Inactivo' : 'Activo';
 
@@ -807,7 +840,7 @@ const cambiarEstado = async (cliente) => {
 .table-input { max-width: 60%; }
 .col-actions { flex-direction: column; align-items: stretch !important; }
 .col-actions::before { display: none; }
-.actions-cell { display: flex; gap: 8px; }
+.actions-cell { display: flex; flex-wrap: wrap; gap: 8px; }
 .actions-cell .btn { flex: 1; }
 .data-table .no-data { display: block; text-align: center; color: var(--muted); padding: 24px 12px; }
 .data-table .no-data::before { display: none; }
@@ -851,7 +884,7 @@ const cambiarEstado = async (cliente) => {
   .data-table td:last-child { border-bottom: 1px solid var(--line); }
   .table-input { max-width: none; }
   .cell-email { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .col-actions { text-align: right !important; }
+  .col-actions { text-align: right !important; width: 30%; }
   .actions-cell { justify-content: flex-end; }
   .actions-cell .btn { flex: none; }
   .btn-sm { padding: 6px 12px; min-height: 0; }

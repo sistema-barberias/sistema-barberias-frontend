@@ -159,26 +159,40 @@ export class ClienteController {
   }
 
   /**
-   * Busca clientes por nombre o correo.
+   * Busca clientes (solo usuarios con rol Cliente) por nombre, correo o teléfono.
    * @param {string} [criterio] Texto a buscar (vacío = todos)
    * @returns {Promise<object[]|string>} Lista de usuarios, o "Error: ..."
    */
   async buscarCliente(criterio = '') {
-    return peticion(`/api/usuarios?criterio=${encodeURIComponent(criterio)}`, 'GET');
+    return peticion(`/api/usuarios?rol=Cliente&criterio=${encodeURIComponent(criterio)}`, 'GET');
   }
 
   /**
-   * Actualiza el nombre y el teléfono de un cliente.
-   * @param {{id_usuario: number, nombre: string, telefono: string}} datos
+   * Actualiza el nombre, teléfono y correo de un cliente.
+   * @param {{id_usuario: number, nombre: string, telefono: string, correo: string}} datos
    * @returns {Promise<object|string>} El usuario actualizado, o "Error: ..."
    */
   async actualizarCliente(datos) {
     const resultado = await peticion(`/api/usuarios/${datos.id_usuario}`, 'PUT', {
       nombre: datos.nombre,
-      telefono: datos.telefono
+      telefono: datos.telefono,
+      correo: datos.correo
     });
 
     return typeof resultado === 'string' ? resultado : resultado.usuario;
+  }
+
+  /**
+   * Elimina un cliente definitivamente.
+   * Si el cliente ya tiene registros asociados (citas, etc.) el backend lo rechaza
+   * y conviene inactivarlo en su lugar.
+   * @param {{id_usuario: number}} datos
+   * @returns {Promise<true|string>} true si se eliminó, o "Error: ..."
+   */
+  async eliminarCliente(datos) {
+    const resultado = await peticion(`/api/usuarios/${datos.id_usuario}`, 'DELETE');
+
+    return typeof resultado === 'string' ? resultado : true;
   }
 
   /**

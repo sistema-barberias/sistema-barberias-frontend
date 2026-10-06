@@ -11,7 +11,7 @@ Construida con [Vue 3](https://vuejs.org/) (`<script setup>`) y [Vite](https://v
 | Iniciar sesión | Todos | Con **correo electrónico o número de teléfono** y contraseña. |
 | Crear cuenta | Visitante | Registro de un cliente nuevo. |
 | Ver mi cuenta | Cliente | Nombre, estado, correo y teléfono. |
-| Gestionar clientes | Administrador | Buscar, crear, editar y activar/inactivar clientes. |
+| Gestionar clientes | Administrador | Buscar, crear, editar, activar/inactivar y eliminar clientes. |
 | Cambiar rol | Sesión iniciada | Alterna entre la vista de Cliente y la de Administrador (para un Cliente, el panel es solo una vista previa sin acciones). |
 
 ## Cómo ejecutarlo
@@ -72,9 +72,10 @@ Por eso la interfaz detecta los errores con `typeof respuesta === 'string'`.
 | --- | --- | --- |
 | `POST` | `/api/usuarios/login` | Iniciar sesión (`correo` **o** `telefono`, más `password`). |
 | `POST` | `/api/usuarios/registro` | Crear un cliente. |
-| `GET` | `/api/usuarios?criterio=` | Buscar clientes. |
-| `PUT` | `/api/usuarios/:id` | Editar nombre y teléfono. |
+| `GET` | `/api/usuarios?rol=Cliente&criterio=` | Buscar clientes por nombre, correo o teléfono. |
+| `PUT` | `/api/usuarios/:id` | Editar nombre, teléfono y correo. |
 | `PATCH` | `/api/usuarios/:id/estado` | Activar o inactivar. |
+| `DELETE` | `/api/usuarios/:id` | Eliminar un cliente (el backend lo rechaza si tiene registros asociados). |
 
 ## Reglas de validación
 
