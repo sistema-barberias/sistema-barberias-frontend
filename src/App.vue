@@ -6,8 +6,26 @@
         <div v-if="usuarioLogueado" class="session-area">
           <span class="session-text">
             <strong>{{ usuarioLogueado.nombre }}</strong>
-            <small>{{ usuarioLogueado.rol }}</small>
+            <small>{{ rolActivo }}</small>
           </span>
+          <details class="role-switch">
+            <summary>Cambiar rol</summary>
+            <div class="role-switch-menu">
+              <p>Rol actual: <strong>{{ rolActivo }}</strong></p>
+              <button
+                v-if="rolActivo === 'Cliente'"
+                type="button"
+                class="btn btn-outline"
+                @click="cambiarRolVista('Administrador')"
+              >Administrador</button>
+              <button
+                v-else
+                type="button"
+                class="btn btn-outline"
+                @click="cambiarRolVista('Cliente')"
+              >Cliente</button>
+            </div>
+          </details>
           <button @click="logout" class="btn btn-outline">Cerrar sesión</button>
         </div>
       </div>
@@ -81,7 +99,7 @@
       <!-- ============ CONTENIDO CON SESIÓN ============ -->
       <section v-else class="content-section">
         <!-- Cliente -->
-        <div v-if="usuarioLogueado.rol === 'Cliente'" class="client-view">
+        <div v-if="rolActivo === 'Cliente'" class="client-view">
           <div class="card welcome-card">
             <h2>¡Hola, {{ usuarioLogueado.nombre }}!</h2>
             <p class="muted">
@@ -100,6 +118,43 @@
             </div>
           </div>
           <p class="hint">Pronto podrás agendar tus citas desde aquí.</p>
+        </div>
+
+        <div
+          v-else-if="rolActivo === 'Administrador' && usuarioLogueado.rol !== 'Administrador'"
+          class="card admin-panel"
+        >
+          <div class="panel-header">
+            <h2>Clientes</h2>
+            <span class="badge preview">Vista previa</span>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Nombre</th>
+                  <th>Teléfono</th>
+                  <th>Correo</th>
+                  <th>Estado</th>
+                  <th class="col-actions">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Cliente de ejemplo</td>
+                  <td>—</td>
+                  <td>cliente@ejemplo.com</td>
+                  <td><span class="badge Activo">Activo</span></td>
+                  <td class="col-actions">
+                    <div class="actions-cell">
+                      <button type="button" class="btn btn-sm btn-outline" disabled>Editar</button>
+                      <button type="button" class="btn btn-sm btn-outline" disabled>Inactivar</button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <!-- Administrador -->
@@ -216,7 +271,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { ClienteController } from './controllers/ClienteController.js';
 
 // Instanciamos el controlador del esquema de clases
@@ -225,6 +280,8 @@ const controlador = new ClienteController();
 // Variables de estado global de la interfaz
 const vistaAuth = ref('login');
 const usuarioLogueado = ref(null);
+const rolVista = ref(null);
+const rolActivo = computed(() => rolVista.value || usuarioLogueado.value?.rol);
 const criterioBusqueda = ref('');
 const listaClientes = ref([]);
 const clienteEditando = ref(null);
@@ -237,6 +294,10 @@ const enviando = ref(false);
 const cambiarVista = (vista) => {
   vistaAuth.value = vista;
   mensaje.value = { tipo: '', texto: '' };
+};
+
+const cambiarRolVista = (rol) => {
+  rolVista.value = rol;
 };
 
 // Validaciones del registro (el backend vuelve a validar: esto es solo para dar respuesta rápida)
@@ -415,6 +476,7 @@ const login = async () => {
   }
 
   usuarioLogueado.value = respuesta;
+  rolVista.value = null;
 
   formAuth.value = {
     correo: '',
@@ -424,6 +486,7 @@ const login = async () => {
 
 const logout = () => {
   usuarioLogueado.value = null;
+  rolVista.value = null;
   mostrarFormNuevo.value = false;
   mensajeAdmin.value = { tipo: '', texto: '' };
   formAuth.value = { correo: '', password: '' };
@@ -474,6 +537,26 @@ const logout = () => {
 .session-area { display: flex; align-items: center; gap: 16px; }
 .session-text { display: flex; flex-direction: column; text-align: right; line-height: 1.2; }
 .session-text small { color: #b9c0d0; }
+.role-switch { position: relative; }
+.role-switch summary { cursor: pointer; font-weight: 600; }
+.role-switch summary:focus-visible { outline: 2px solid var(--red); outline-offset: 4px; }
+.role-switch-menu {
+  position: absolute;
+  z-index: 1;
+  top: calc(100% + 12px);
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 260px;
+  padding: 16px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(22, 33, 58, .16);
+}
+.role-switch-menu p { margin: 0; }
 
 /* ---------- Layout ---------- */
 .main { width: 100%; padding: 40px; }
@@ -610,6 +693,7 @@ const logout = () => {
 .badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: .8rem; font-weight: 700; }
 .badge.Activo { background: #e1f3ea; color: #17623c; }
 .badge.Inactivo { background: #f4e0e1; color: #8f1d24; }
+.badge.preview { background: #eef0f4; color: var(--muted); }
 
 /* ---------- Responsive ---------- */
 @media (max-width: 640px) {
@@ -622,5 +706,6 @@ const logout = () => {
   .panel-actions { flex-direction: column; align-items: stretch; }
   .form-actions { flex-direction: column-reverse; }
   .session-text { display: none; }
+  .role-switch-menu { right: -90px; }
 }
 </style>
