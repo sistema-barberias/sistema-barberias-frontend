@@ -52,8 +52,8 @@
             <h2>Bienvenido de nuevo</h2>
             <p v-if="mensaje.texto" :class="['alert', mensaje.tipo]" role="alert">{{ mensaje.texto }}</p>
             <div class="form-group">
-              <label for="login-correo">Correo electrónico</label>
-              <input id="login-correo" type="email" v-model="formAuth.correo" placeholder="ejemplo@correo.com" required>
+              <label for="login-correo">Correo electrónico o teléfono</label>
+              <input id="login-correo" type="text" v-model="formAuth.correo" placeholder="ejemplo@correo.com o 3001234567" required>
             </div>
             <div class="form-group">
               <label for="login-pass">Contraseña</label>

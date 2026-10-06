@@ -4,8 +4,18 @@ export class ClienteController {
 
   // Iniciar sesión
   async iniciarSesion(datos) {
-    if (!datos.correo || !datos.password) {
-      return "Error: El correo y la contraseña son obligatorios";
+    // "correo" puede traer un correo electrónico o un número de teléfono
+    const identificador = (datos.correo || '').trim();
+
+    if (!identificador || !datos.password) {
+      return "Error: El correo o teléfono y la contraseña son obligatorios";
+    }
+
+    const esCorreo = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identificador);
+    const esTelefono = /^\d+$/.test(identificador);
+
+    if (!esCorreo && !esTelefono) {
+      return "Error: Ingresa un correo válido o un teléfono solo con números";
     }
 
     try {
@@ -17,7 +27,8 @@ export class ClienteController {
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            correo: datos.correo,
+            correo: esCorreo ? identificador : undefined,
+            telefono: esTelefono ? identificador : undefined,
             password: datos.password
           })
         }
