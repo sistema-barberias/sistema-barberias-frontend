@@ -294,6 +294,159 @@
               </tbody>
             </table>
           </div>
+          <div class="services-section">
+
+  <h2>Gestión de servicios</h2>
+  <p class="section-description">
+    Consulta, modifica o elimina los servicios registrados en BarberFlow.
+  </p>
+
+  <div class="table-wrap">
+    <table class="services-table">
+      <thead>
+        <tr>
+          <th>Nombre</th>
+          <th>Precio</th>
+          <th>Descripción</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        <tr
+          v-for="servicio in listaServicios"
+          :key="servicio.id_servicio"
+        >
+
+          <!-- NOMBRE -->
+          <td>
+            <template v-if="estaEditandoServicio(servicio)">
+              <input
+                type="text"
+                v-model="servicioEditando.nombre"
+                placeholder="Nombre del servicio"
+              />
+            </template>
+
+            <template v-else>
+              {{ servicio.nombre }}
+            </template>
+          </td>
+
+          <!-- PRECIO -->
+          <td>
+            <template v-if="estaEditandoServicio(servicio)">
+              <input
+                type="number"
+                v-model.number="servicioEditando.precio"
+                min="0"
+                placeholder="Precio"
+              />
+            </template>
+
+            <template v-else>
+              ${{ servicio.precio }}
+            </template>
+          </td>
+
+          <!-- DESCRIPCIÓN -->
+          <td>
+            <template v-if="estaEditandoServicio(servicio)">
+              <input
+                type="text"
+                v-model="servicioEditando.descripcion"
+                placeholder="Descripción"
+              />
+            </template>
+
+            <template v-else>
+              {{ servicio.descripcion }}
+            </template>
+          </td>
+
+          <!-- ACCIONES -->
+          <td>
+            <template v-if="estaEditandoServicio(servicio)">
+
+              <button
+                class="btn-save"
+                @click="guardarEdicionServicio"
+              >
+                Guardar
+              </button>
+
+              <button
+                class="btn-cancel"
+                @click="cancelarEdicionServicio"
+              >
+                Cancelar
+              </button>
+
+            </template>
+
+            <template v-else-if="idServicioEliminando === servicio.id_servicio">
+  <p>¿Estás seguro de eliminar este servicio?</p>
+
+  <button
+    type="button"
+    class="btn btn-sm btn-danger"
+    @click="eliminarServicio(servicio)"
+  >
+    Sí, eliminar
+  </button>
+
+  <button
+    type="button"
+    class="btn btn-sm btn-outline"
+    @click="idServicioEliminando = null"
+  >
+    No, cancelar
+  </button>
+</template>
+
+<template v-else>
+  <div class="actions-cell">
+    <button
+      type="button"
+      class="btn btn-sm btn-outline"
+      @click="editarServicio(servicio)"
+    >
+      Editar
+    </button>
+
+    <button
+      type="button"
+      class="btn btn-sm btn-danger"
+      @click="pedirConfirmacionEliminarServicio(servicio)"
+    >
+      Eliminar
+    </button>
+  </div>
+</template>        
+
+          </td>
+        </tr>
+
+        <!-- CUANDO NO HAY SERVICIOS -->
+        <tr v-if="listaServicios.length === 0">
+          <td colspan="4" class="no-data">
+            No hay servicios registrados.
+          </td>
+        </tr>
+
+      </tbody>
+    </table>
+  </div>
+
+  <!-- MENSAJE DE ERROR -->
+  <p
+    v-if="errorEdicionServicio"
+    class="error-message"
+  >
+    {{ errorEdicionServicio }}
+  </p>
+
+</div>
         </div>
       </section>
     </main>
@@ -304,10 +457,13 @@
 import { ref, computed } from 'vue';
 import CampoForm from './components/CampoForm.vue';
 import { ClienteController, validarLogin, validarRegistro } from './controllers/ClienteController.js';
+import { ServicioController, validarServicio } from './controllers/ServicioController.js';
+
 
 // El controlador es el único que habla con el backend.
 // Sus métodos devuelven el dato pedido, o un texto "Error: ..." si algo falló.
 const controlador = new ClienteController();
+const servicioController = new ServicioController();
 
 // =====================================================
 // UTILIDADES
@@ -377,6 +533,12 @@ const mostrarFormNuevo = ref(false);
 const enviandoAdmin = ref(false);
 const mensajeAdmin = ref({ ...MENSAJE_VACIO });   // Avisos generales del panel (éxito, o error al buscar / cambiar estado)
 
+// --- Estado para Servicios (HU-06) ---
+const listaServicios = ref([]);
+const servicioEditando = ref(null);
+const errorEdicionServicio = ref('');
+const idServicioEliminando = ref(null);
+
 // =====================================================
 // AUTENTICACIÓN
 // =====================================================
@@ -412,6 +574,7 @@ const login = async () => {
   // Solo el administrador necesita la lista de clientes
   if (esAdministradorReal.value) {
     await buscarClientes();
+    await buscarServicios();
   }
 };
 
@@ -426,6 +589,11 @@ const logout = () => {
   mensajeAdmin.value = { ...MENSAJE_VACIO };
   errores.value = {};
   mensajeExito.value = '';
+// Limpiar datos de servicios
+listaServicios.value = [];
+servicioEditando.value = null;
+errorEdicionServicio.value = '';
+idServicioEliminando.value = null;
 };
 
 // =====================================================
@@ -518,6 +686,75 @@ const buscarConRetraso = () => {
   clearTimeout(temporizadorBusqueda);
   temporizadorBusqueda = setTimeout(buscarClientes, 300);
 };
+
+// =====================================================
+// PANEL DE ADMINISTRADOR: GESTIÓN DE SERVICIOS (HU-06)
+// =====================================================
+
+const buscarServicios = async () => {
+  const respuesta = await servicioController.obtenerServicios();
+  if (esError(respuesta)) {
+    mensajeAdmin.value = { tipo: 'error', texto: quitarPrefijoError(respuesta) };
+    return;
+  }
+  listaServicios.value = respuesta;
+};
+
+const estaEditandoServicio = (servicio) => servicioEditando.value?.id_servicio === servicio.id_servicio;
+
+const editarServicio = (servicio) => {
+  servicioEditando.value = { ...servicio };
+  errorEdicionServicio.value = '';
+  idServicioEliminando.value = null;
+  mensajeAdmin.value = { ...MENSAJE_VACIO };
+};
+
+const cancelarEdicionServicio = () => {
+  servicioEditando.value = null;
+  errorEdicionServicio.value = '';
+};
+
+const guardarEdicionServicio = async () => {
+  const erroresVal = validarServicio(servicioEditando.value);
+
+  if (hayErrores(erroresVal)) {
+    errorEdicionServicio.value = Object.values(erroresVal)[0];
+    return;
+  }
+
+  const respuesta = await servicioController.actualizarServicio(servicioEditando.value);
+
+  if (esError(respuesta)) {
+    errorEdicionServicio.value = quitarPrefijoError(respuesta);
+    return;
+  }
+
+  cancelarEdicionServicio();
+  mensajeAdmin.value = { tipo: 'exito', texto: 'Servicio actualizado correctamente.' };
+  await buscarServicios();
+};
+
+const pedirConfirmacionEliminarServicio = (servicio) => {
+  idServicioEliminando.value = servicio.id_servicio;
+  mensajeAdmin.value = { ...MENSAJE_VACIO };
+};
+
+const eliminarServicio = async (servicio) => {
+  const respuesta = await servicioController.eliminarServicio(servicio.id_servicio);
+  idServicioEliminando.value = null;
+
+  if (esError(respuesta)) {
+    mensajeAdmin.value = { tipo: 'error', texto: quitarPrefijoError(respuesta) };
+    return;
+  }
+
+  mensajeAdmin.value = { tipo: 'exito', texto: `Servicio "${servicio.nombre}" eliminado correctamente.` };
+  await buscarServicios();
+};
+// =====================================================
+// FIN PANEL DE ADMINISTRADOR: GESTIÓN DE SERVICIOS (HU-06)
+// =====================================================
+
 
 // ¿Es esta la fila que se está editando?
 const estaEditando = (cliente) => clienteEditando.value?.id_usuario === cliente.id_usuario;
@@ -807,6 +1044,70 @@ const cambiarEstado = async (cliente) => {
 }
 .new-client-form h3 { font-size: 1.1rem; }
 .form-actions { display: flex; flex-direction: column-reverse; gap: 12px; }
+
+/* ---------- Gestión de servicios (HU-06) ---------- */
+.services-section {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
+}
+
+.services-section h2 {
+  margin-bottom: 8px;
+  font-size: 1.3rem;
+}
+
+.section-description {
+  margin-bottom: 16px !important;
+  color: var(--muted);
+}
+
+.services-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--surface);
+}
+.services-section .table-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.services-table {
+  min-width: 650px;
+}
+
+.services-table th,
+.services-table td {
+  padding: 14px 12px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+
+.services-table th {
+  background: var(--sand);
+  color: var(--muted);
+  font-size: .8rem;
+  text-transform: uppercase;
+}
+
+.services-table input {
+  width: 100%;
+  min-height: var(--touch);
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 16px;
+}
+
+.services-table button {
+  margin: 3px;
+}
+
+.error-message {
+  margin-top: 12px !important;
+  color: var(--red-dark);
+  font-size: .9rem;
+}
 
 /* ---------- Tabla de clientes ---------- */
 /*
