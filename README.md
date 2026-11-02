@@ -33,7 +33,11 @@ La dirección del backend se configura con la variable `VITE_API_URL`. Crea un a
 VITE_API_URL=https://tu-backend.com
 ```
 
-Si no existe, se usa `http://localhost:3000`. Recuerda **iniciar el backend** antes de probar el login.
+Si no existe, se usa `http://localhost:3000`. Recuerda **iniciar el backend** antes de probar el login:
+sigue los pasos del README de `sistema-barberias-backend` (`npm install`, crear su `.env` y `npm run dev`).
+
+Si no quieres levantar el backend, puedes apuntar al publicado creando un archivo `.env.local` (no se sube a GitHub; hay un ejemplo en `.env.example`).
+Ojo: así trabajas con la base de datos real.
 
 ## Estructura del proyecto
 
@@ -80,6 +84,7 @@ Por eso la interfaz detecta los errores con `typeof respuesta === 'string'`.
 ## Reglas de validación
 
 - **Correo (registro):** debe ser `@gmail.com` o `@hotmail.com`.
+- **Nombre:** solo letras (con tildes) y espacios.
 - **Teléfono:** solo números.
 - **Contraseña (registro):** exactamente 6 dígitos numéricos.
 - **Login:** acepta cualquier correo con formato válido, o un teléfono (solo números).
