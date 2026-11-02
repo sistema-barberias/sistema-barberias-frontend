@@ -10,6 +10,7 @@
  * (archivo .env); si no existe, se usa el servidor local.
  */
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+let tokenSesion = null;
 
 // Expresiones regulares de validación
 const REGEX_CORREO_LOGIN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/; // Cualquier correo con formato válido
@@ -26,19 +27,27 @@ const REGEX_PASSWORD = /^\d{6}$/; // Exactamente 6 dígitos
  * @param {object} [cuerpo] Datos a enviar en formato JSON (opcional)
  * @returns {Promise<any>}  Los datos de la respuesta, o "Error: ..." si falló
  */
+
 async function peticion(ruta, metodo, cuerpo) {
   try {
-    const opciones = { method: metodo };
+    const opciones = {
+      method: metodo,
+      headers: {}
+    };
+
+    // Enviar el token cuando exista una sesión iniciada
+    if (tokenSesion) {
+      opciones.headers.Authorization = `Bearer ${tokenSesion}`;
+    }
 
     if (cuerpo) {
-      opciones.headers = { 'Content-Type': 'application/json' };
+      opciones.headers['Content-Type'] = 'application/json';
       opciones.body = JSON.stringify(cuerpo);
     }
 
     const respuesta = await fetch(`${API_URL}${ruta}`, opciones);
     const resultado = await respuesta.json();
 
-    // El backend explica el problema en el campo "mensaje"
     if (!respuesta.ok) {
       return `Error: ${resultado.mensaje}`;
     }
@@ -138,7 +147,13 @@ export class ClienteController {
       password: datos.password
     });
 
-    return typeof resultado === 'string' ? resultado : resultado.usuario;
+    if (typeof resultado === 'string') {
+      return resultado;
+    }
+
+    tokenSesion = resultado.token;
+
+    return resultado.usuario;
   }
 
   /**
@@ -211,4 +226,67 @@ export class ClienteController {
 
     return typeof resultado === 'string' ? resultado : resultado.usuario;
   }
+
+  /**
+   * Registra un nuevo servicio en la barbería.
+   * @param {{nombre: string, descripcion: string, precio: number, duracion: number}} datos
+   * @returns {Promise<object|string>} El servicio creado o un mensaje de error.
+   */
+  async registrarServicio(datos) {
+    const resultado = await peticion('/api/servicios', 'POST', {
+      nombre: datos.nombre,
+      descripcion: datos.descripcion,
+      precio: Number(datos.precio),
+      duracion: Number(datos.duracion)
+    });
+
+    return typeof resultado === 'string'
+      ? resultado
+      : resultado.servicio;
+  }
+
+  /**
+   * Consulta los servicios registrados en la barbería.
+   */
+  async buscarServicios() {
+    const resultado = await peticion('/api/servicios', 'GET');
+
+    return typeof resultado === 'string'
+      ? resultado
+      : resultado.servicios;
+  }
+
+
+  /**
+   * Actualiza la información de un servicio.
+   */
+  async actualizarServicio(id, datos) {
+    const resultado = await peticion(`/api/servicios/${id}`, 'PUT', {
+      nombre: datos.nombre,
+      descripcion: datos.descripcion,
+      precio: Number(datos.precio),
+      duracion: Number(datos.duracion)
+    });
+
+    return typeof resultado === 'string'
+      ? resultado
+      : resultado.servicio;
+  }
+
+  /**
+   * Elimina definitivamente un servicio.
+   */
+  async eliminarServicio(id) {
+    const resultado = await peticion(`/api/servicios/${id}`, 'DELETE');
+
+    return typeof resultado === 'string'
+      ? resultado
+      : resultado.mensaje;
+  }
+
+
+  cerrarSesion() {
+    tokenSesion = null;
+  }
+
 }

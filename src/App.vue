@@ -22,19 +22,6 @@
             <small>{{ rolActivo }}</small>
           </span>
 
-          <!-- Menú para alternar entre la vista de Cliente y la de Administrador -->
-          <details class="role-switch">
-            <summary>Cambiar rol</summary>
-            <div class="role-switch-menu">
-              <p>Rol actual: <strong>{{ rolActivo }}</strong></p>
-              <button
-                type="button"
-                class="btn btn-outline"
-                @click="rolVista = rolActivo === 'Cliente' ? 'Administrador' : 'Cliente'"
-              >{{ rolActivo === 'Cliente' ? 'Administrador' : 'Cliente' }}</button>
-            </div>
-          </details>
-
           <button type="button" class="btn btn-outline" @click="logout">Cerrar sesión</button>
         </div>
       </div>
@@ -148,58 +135,51 @@
           <p class="hint">Pronto podrás agendar tus citas desde aquí.</p>
         </div>
 
-        <!-- Vista previa del panel: un Cliente que pulsó "Cambiar rol" ve la tabla sin poder usarla -->
-        <div v-else-if="!esAdministradorReal" class="card admin-panel">
-          <div class="panel-header">
-            <h2>Clientes</h2>
-            <span class="badge preview">Vista previa</span>
-          </div>
-          <div class="table-wrap">
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>Nombre</th>
-                  <th>Teléfono</th>
-                  <th>Correo</th>
-                  <th>Estado</th>
-                  <th class="col-actions">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td data-label="Nombre">Cliente de ejemplo</td>
-                  <td data-label="Teléfono">—</td>
-                  <td data-label="Correo" class="cell-email">cliente@ejemplo.com</td>
-                  <td data-label="Estado"><span class="badge Activo">Activo</span></td>
-                  <td data-label="Acciones" class="col-actions">
-                    <div class="actions-cell">
-                      <button type="button" class="btn btn-sm btn-outline" disabled>Editar</button>
-                      <button type="button" class="btn btn-sm btn-outline" disabled>Inactivar</button>
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
         <!-- 3. Panel real del Administrador -->
         <div v-else class="card admin-panel">
           <div class="panel-header">
-            <h2>Clientes</h2>
+            <h2>{{ vistaAdmin === 'clientes' ? 'Clientes' : 'Servicios' }}</h2>
+
             <div class="panel-actions">
-              <input
-                class="search-input"
-                type="search"
-                v-model="criterioBusqueda"
-                @input="buscarConRetraso"
-                placeholder="Buscar por nombre, teléfono o correo"
+              <button
+                type="button"
+                class="btn"
+                :class="vistaAdmin === 'clientes' ? 'btn-primary' : 'btn-outline'"
+                @click="vistaAdmin = 'clientes'"
               >
-              <button type="button" class="btn btn-primary" @click="alternarFormNuevo">
-                {{ mostrarFormNuevo ? 'Cerrar' : '+ Nuevo cliente' }}
+                Clientes
               </button>
+
+              <button
+                type="button"
+                class="btn"
+                :class="vistaAdmin === 'servicios' ? 'btn-primary' : 'btn-outline'"
+                @click="vistaAdmin = 'servicios'; buscarServicios()"
+              >
+                Servicios
+              </button>
+
+              <template v-if="vistaAdmin === 'clientes'">
+                <input
+                  class="search-input"
+                  type="search"
+                  v-model="criterioBusqueda"
+                  @input="buscarConRetraso"
+                  placeholder="Buscar por nombre, teléfono o correo"
+                >
+
+                <button
+                  type="button"
+                  class="btn btn-primary"
+                  @click="alternarFormNuevo"
+                >
+                  {{ mostrarFormNuevo ? 'Cerrar' : '+ Nuevo cliente' }}
+                </button>
+              </template>
             </div>
           </div>
+
+          <div v-if="vistaAdmin === 'clientes'">
 
           <!-- Mensaje general del panel (se oculta mientras el formulario nuevo muestra el suyo) -->
           <p v-if="!mostrarFormNuevo && mensajeAdmin.texto" :class="['alert', mensajeAdmin.tipo]" role="alert">{{ mensajeAdmin.texto }}</p>
@@ -294,160 +274,252 @@
               </tbody>
             </table>
           </div>
-          <div class="services-section">
-
-  <h2>Gestión de servicios</h2>
-  <p class="section-description">
-    Consulta, modifica o elimina los servicios registrados en BarberFlow.
-  </p>
-
-  <div class="table-wrap">
-    <table class="services-table">
-      <thead>
-        <tr>
-          <th>Nombre</th>
-          <th>Precio</th>
-          <th>Descripción</th>
-          <th>Acciones</th>
-        </tr>
-      </thead>
-
-      <tbody>
-        <tr
-          v-for="servicio in listaServicios"
-          :key="servicio.id_servicio"
-        >
-
-          <!-- NOMBRE -->
-          <td>
-            <template v-if="estaEditandoServicio(servicio)">
-              <input
-                type="text"
-                v-model="servicioEditando.nombre"
-                placeholder="Nombre del servicio"
-              />
-            </template>
-
-            <template v-else>
-              {{ servicio.nombre }}
-            </template>
-          </td>
-
-          <!-- PRECIO -->
-          <td>
-            <template v-if="estaEditandoServicio(servicio)">
-              <input
-                type="number"
-                v-model.number="servicioEditando.precio"
-                min="0"
-                placeholder="Precio"
-              />
-            </template>
-
-            <template v-else>
-              ${{ servicio.precio }}
-            </template>
-          </td>
-
-          <!-- DESCRIPCIÓN -->
-          <td>
-            <template v-if="estaEditandoServicio(servicio)">
-              <input
-                type="text"
-                v-model="servicioEditando.descripcion"
-                placeholder="Descripción"
-              />
-            </template>
-
-            <template v-else>
-              {{ servicio.descripcion }}
-            </template>
-          </td>
-
-          <!-- ACCIONES -->
-          <td>
-            <template v-if="estaEditandoServicio(servicio)">
-
-              <button
-                class="btn-save"
-                @click="guardarEdicionServicio"
-              >
-                Guardar
-              </button>
-
-              <button
-                class="btn-cancel"
-                @click="cancelarEdicionServicio"
-              >
-                Cancelar
-              </button>
-
-            </template>
-
-            <template v-else-if="idServicioEliminando === servicio.id_servicio">
-  <p>¿Estás seguro de eliminar este servicio?</p>
-
-  <button
-    type="button"
-    class="btn btn-sm btn-danger"
-    @click="eliminarServicio(servicio)"
-  >
-    Sí, eliminar
-  </button>
-
-  <button
-    type="button"
-    class="btn btn-sm btn-outline"
-    @click="idServicioEliminando = null"
-  >
-    No, cancelar
-  </button>
-</template>
-
-<template v-else>
-  <div class="actions-cell">
-    <button
-      type="button"
-      class="btn btn-sm btn-outline"
-      @click="editarServicio(servicio)"
-    >
-      Editar
-    </button>
-
-    <button
-      type="button"
-      class="btn btn-sm btn-danger"
-      @click="pedirConfirmacionEliminarServicio(servicio)"
-    >
-      Eliminar
-    </button>
-  </div>
-</template>        
-
-          </td>
-        </tr>
-
-        <!-- CUANDO NO HAY SERVICIOS -->
-        <tr v-if="listaServicios.length === 0">
-          <td colspan="4" class="no-data">
-            No hay servicios registrados.
-          </td>
-        </tr>
-
-      </tbody>
-    </table>
-  </div>
-
-  <!-- MENSAJE DE ERROR -->
-  <p
-    v-if="errorEdicionServicio"
-    class="error-message"
-  >
-    {{ errorEdicionServicio }}
-  </p>
-
-</div>
         </div>
+
+        <div v-else class="services-view">
+          <form
+            class="new-client-form"
+            novalidate
+            @submit.prevent="registrarServicio"
+          >
+            <h3>Registrar nuevo servicio</h3>
+
+            <p class="hint">
+              Completa la información del servicio que ofrece la barbería.
+            </p>
+
+            <div class="form-row">
+              <CampoForm
+                id="servicio-nombre"
+                label="Nombre del servicio"
+                v-model="formServicio.nombre"
+                :error="erroresServicio.nombre"
+                placeholder="Ej. Corte clásico"
+              />
+        
+              <CampoForm
+                id="servicio-precio"
+                label="Precio"
+                type="number"
+                v-model="formServicio.precio"
+                :error="erroresServicio.precio"
+                placeholder="Ej. 25000"
+              />
+            </div>
+        
+            <CampoForm
+              id="servicio-descripcion"
+              label="Descripción"
+              v-model="formServicio.descripcion"
+              placeholder="Describe brevemente el servicio"
+            />
+        
+            <CampoForm
+              id="servicio-duracion"
+              label="Duración en minutos"
+              type="number"
+              v-model="formServicio.duracion"
+              :error="erroresServicio.duracion"
+              placeholder="Ej. 30"
+            />
+        
+            <p
+              v-if="mensajeServicio.texto"
+              :class="['alert', mensajeServicio.tipo]"
+              role="alert"
+            >
+              {{ mensajeServicio.texto }}
+            </p>
+        
+            <div class="form-actions">
+              <button
+                type="button"
+                class="btn btn-outline"
+                @click="vistaAdmin = 'clientes'"
+              >
+                Volver a clientes
+              </button>
+        
+              <button
+                type="submit"
+                class="btn btn-primary"
+                :disabled="enviandoServicio"
+              >
+                {{ enviandoServicio ? 'Registrando...' : 'Registrar servicio' }}
+              </button>
+            </div>
+          </form>
+          <div class="services-list">
+            <h3>Servicios registrados</h3>
+
+            <p v-if="cargandoServicios" class="hint">
+              Cargando servicios...
+            </p>
+
+            <div v-else class="table-container">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Nombre</th>
+                    <th>Descripción</th>
+                    <th>Precio</th>
+                    <th>Duración</th>
+                   <th>Estado</th>
+                    <th class="col-actions">Acciones</th>
+                  </tr>
+                </thead>
+              
+                <tbody>
+                  <tr
+                    v-for="servicio in listaServicios"
+                    :key="servicio.id_servicio"
+                  >
+                    <td data-label="Nombre">
+                      <input
+                        v-if="servicioEditando?.id_servicio === servicio.id_servicio"
+                        type="text"
+                        v-model="servicioEditando.nombre"
+                        class="table-input"
+                      />
+                      <span v-else>{{ servicio.nombre }}</span>
+                    </td>
+              
+                    <td data-label="Descripción">
+                      <input
+                        v-if="servicioEditando?.id_servicio === servicio.id_servicio"
+                        type="text"
+                        v-model="servicioEditando.descripcion"
+                        class="table-input"
+                      />
+                      <span v-else>{{ servicio.descripcion || 'Sin descripción' }}</span>
+                    </td>
+              
+                    <td data-label="Precio">
+                      <input
+                        v-if="servicioEditando?.id_servicio === servicio.id_servicio"
+                        type="number"
+                        min="1"
+                        v-model="servicioEditando.precio"
+                        class="table-input"
+                      />
+                      <span v-else>
+                        ${{ Number(servicio.precio).toLocaleString('es-CO') }}
+                      </span>
+                    </td>
+              
+                    <td data-label="Duración">
+                      <input
+                        v-if="servicioEditando?.id_servicio === servicio.id_servicio"
+                        type="number"
+                        min="1"
+                        step="1"
+                        v-model="servicioEditando.duracion"
+                        class="table-input"
+                      />
+                      <span v-else>{{ servicio.duracion }} minutos</span>
+                    </td>
+              
+                    <td data-label="Estado">
+                      <span :class="['badge', servicio.estado]">
+                        {{ servicio.estado }}
+                      </span>
+                    </td>
+              
+                    <td data-label="Acciones" class="col-actions">
+              
+                      <!-- Modo edición -->
+                      <template
+                        v-if="servicioEditando?.id_servicio === servicio.id_servicio"
+                      >
+                        <p
+                          v-if="errorEdicionServicio"
+                          class="field-error"
+                          role="alert"
+                        >
+                          {{ errorEdicionServicio }}
+                        </p>
+              
+                        <div class="actions-cell">
+                          <button
+                            type="button"
+                            class="btn btn-sm btn-primary"
+                            :disabled="enviandoEdicionServicio"
+                            @click="guardarEdicionServicio"
+                          >
+                            {{ enviandoEdicionServicio ? 'Guardando...' : 'Guardar' }}
+                          </button>
+              
+                          <button
+                            type="button"
+                            class="btn btn-sm btn-outline"
+                            :disabled="enviandoEdicionServicio"
+                            @click="cancelarEdicionServicio"
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      </template>
+              
+                      <!-- Confirmación de eliminación -->
+                      <template
+                        v-else-if="idEliminandoServicio === servicio.id_servicio"
+                      >
+                        <p class="field-error">
+                          ¿Eliminar "{{ servicio.nombre }}" definitivamente?
+                        </p>
+              
+                        <div class="actions-cell">
+                          <button
+                            type="button"
+                            class="btn btn-sm btn-danger"
+                            @click="eliminarServicioAdmin(servicio)"
+                          >
+                            Sí, eliminar
+                          </button>
+              
+                          <button
+                            type="button"
+                            class="btn btn-sm btn-outline"
+                            @click="idEliminandoServicio = null"
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      </template>
+              
+                      <!-- Modo normal -->
+                      <div v-else class="actions-cell">
+                        <button
+                          type="button"
+                          class="btn btn-sm btn-outline"
+                          @click="editarServicio(servicio)"
+                        >
+                          Editar
+                        </button>
+              
+                        <button
+                          type="button"
+                          class="btn btn-sm btn-danger"
+                          @click="pedirConfirmacionEliminarServicio(servicio)"
+                        >
+                          Eliminar
+                        </button>
+                      </div>
+              
+                    </td>
+                  </tr>
+              
+                  <tr v-if="listaServicios.length === 0 && !cargandoServicios">
+                    <td colspan="6" class="no-data">
+                      No hay servicios registrados.
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
       </section>
     </main>
   </div>
@@ -457,13 +529,10 @@
 import { ref, computed } from 'vue';
 import CampoForm from './components/CampoForm.vue';
 import { ClienteController, validarLogin, validarRegistro } from './controllers/ClienteController.js';
-import { ServicioController, validarServicio } from './controllers/ServicioController.js';
-
 
 // El controlador es el único que habla con el backend.
 // Sus métodos devuelven el dato pedido, o un texto "Error: ..." si algo falló.
 const controlador = new ClienteController();
-const servicioController = new ServicioController();
 
 // =====================================================
 // UTILIDADES
@@ -508,9 +577,8 @@ const validarFormularioCliente = (f) => {
 // =====================================================
 
 // --- Sesión ---
-const usuarioLogueado = ref(null);   // Datos del usuario que inició sesión (o null)
-const rolVista = ref(null);          // Rol elegido en "Cambiar rol" (null = usar el rol real)
-const rolActivo = computed(() => rolVista.value || usuarioLogueado.value?.rol);
+const usuarioLogueado = ref(null);
+const rolActivo = computed(() => usuarioLogueado.value?.rol);
 const esAdministradorReal = computed(() => usuarioLogueado.value?.rol === 'Administrador');
 
 // --- Autenticación (login / registro) ---
@@ -534,10 +602,27 @@ const enviandoAdmin = ref(false);
 const mensajeAdmin = ref({ ...MENSAJE_VACIO });   // Avisos generales del panel (éxito, o error al buscar / cambiar estado)
 
 // --- Estado para Servicios (HU-06) ---
+const vistaAdmin = ref('clientes');
+
+const formServicio = ref({
+  nombre: '',
+  descripcion: '',
+  precio: '',
+  duracion: ''
+});
+
 const listaServicios = ref([]);
+const cargandoServicios = ref(false);
 const servicioEditando = ref(null);
 const errorEdicionServicio = ref('');
-const idServicioEliminando = ref(null);
+const idEliminandoServicio = ref(null);
+const enviandoEdicionServicio = ref(false);
+const erroresServicio = ref({});
+const enviandoServicio = ref(false);
+const mensajeServicio = ref({
+  texto: '',
+  tipo: ''
+});
 
 // =====================================================
 // AUTENTICACIÓN
@@ -567,7 +652,6 @@ const login = async () => {
   }
 
   usuarioLogueado.value = respuesta;
-  rolVista.value = null;
   errores.value = {};
   formAuth.value = { correo: '', password: '' };
 
@@ -580,8 +664,9 @@ const login = async () => {
 
 // Cierra la sesión y limpia todo lo relacionado con el usuario
 const logout = () => {
+  controlador.cerrarSesion();
+
   usuarioLogueado.value = null;
-  rolVista.value = null;
   mostrarFormNuevo.value = false;
   clienteEditando.value = null;
   listaClientes.value = [];
@@ -593,7 +678,7 @@ const logout = () => {
 listaServicios.value = [];
 servicioEditando.value = null;
 errorEdicionServicio.value = '';
-idServicioEliminando.value = null;
+idEliminandoServicio.value = null;
 };
 
 // =====================================================
@@ -664,6 +749,217 @@ const crearClienteAdmin = async () => {
   await buscarClientes();
 };
 
+// --- Registro de servicios ---
+
+const registrarServicio = async () => {
+  erroresServicio.value = {};
+  mensajeServicio.value = { texto: '', tipo: '' };
+
+  const errores = {};
+  const { nombre, descripcion, precio, duracion } = formServicio.value;
+
+  if (!nombre.trim()) {
+    errores.nombre = 'El nombre del servicio es obligatorio.';
+  }
+
+  if (
+    precio === '' ||
+    !Number.isFinite(Number(precio)) ||
+    Number(precio) <= 0
+  ) {
+    errores.precio = 'Ingresa un precio válido mayor que cero.';
+  }
+
+  if (
+    duracion === '' ||
+    !Number.isInteger(Number(duracion)) ||
+    Number(duracion) <= 0
+  ) {
+    errores.duracion = 'Ingresa una duración válida en minutos.';
+  }
+
+  if (Object.keys(errores).length > 0) {
+    erroresServicio.value = errores;
+    return;
+  }
+
+  enviandoServicio.value = true;
+
+  try {
+    const resultado = await controlador.registrarServicio({
+      nombre: nombre.trim(),
+      descripcion: descripcion.trim(),
+      precio,
+      duracion
+    });
+
+    if (typeof resultado === 'string') {
+      mensajeServicio.value = {
+        tipo: 'error',
+        texto: resultado.replace(/^Error:\s*/, '')
+      };
+      return;
+    }
+
+    formServicio.value = {
+      nombre: '',
+      descripcion: '',
+      precio: '',
+      duracion: ''
+    };
+
+    mensajeServicio.value = {
+      tipo: 'exito',
+      texto: `¡Servicio "${resultado.nombre}" registrado correctamente!`
+    };
+    await buscarServicios();
+
+  } catch (error) {
+    mensajeServicio.value = {
+      tipo: 'error',
+      texto: 'No se pudo registrar el servicio. Inténtalo nuevamente.'
+    };
+  } finally {
+    enviandoServicio.value = false;
+  }
+};
+
+const buscarServicios = async () => {
+  cargandoServicios.value = true;
+
+  try {
+    const resultado = await controlador.buscarServicios();
+
+    if (typeof resultado === 'string') {
+      mensajeServicio.value = {
+        tipo: 'error',
+        texto: resultado.replace(/^Error:\s*/, '')
+      };
+      return;
+    }
+
+    listaServicios.value = resultado;
+
+  } catch (error) {
+    mensajeServicio.value = {
+      tipo: 'error',
+      texto: 'No se pudieron consultar los servicios.'
+    };
+  } finally {
+    cargandoServicios.value = false;
+  }
+};
+
+
+const editarServicio = (servicio) => {
+  servicioEditando.value = {
+    id_servicio: servicio.id_servicio,
+    nombre: servicio.nombre,
+    descripcion: servicio.descripcion || '',
+    precio: servicio.precio,
+    duracion: servicio.duracion
+  };
+
+  errorEdicionServicio.value = '';
+  idEliminandoServicio.value = null;
+};
+
+const cancelarEdicionServicio = () => {
+  servicioEditando.value = null;
+  errorEdicionServicio.value = '';
+};
+
+const guardarEdicionServicio = async () => {
+  if (enviandoEdicionServicio.value) return;
+
+  errorEdicionServicio.value = '';
+
+  const { nombre, precio, duracion } = servicioEditando.value;
+
+  if (!nombre.trim()) {
+    errorEdicionServicio.value = 'El nombre del servicio es obligatorio.';
+    return;
+  }
+
+  if (
+    precio === '' ||
+    !Number.isFinite(Number(precio)) ||
+    Number(precio) <= 0
+  ) {
+    errorEdicionServicio.value = 'Ingresa un precio válido mayor que cero.';
+    return;
+  }
+
+  if (
+    duracion === '' ||
+    !Number.isInteger(Number(duracion)) ||
+    Number(duracion) <= 0
+  ) {
+    errorEdicionServicio.value = 'Ingresa una duración válida en minutos.';
+    return;
+  }
+
+  enviandoEdicionServicio.value = true;
+
+  try {
+    const resultado = await controlador.actualizarServicio(
+      servicioEditando.value.id_servicio,
+      {
+        nombre: nombre.trim(),
+        descripcion: servicioEditando.value.descripcion.trim(),
+        precio,
+        duracion
+      }
+    );
+
+    if (typeof resultado === 'string') {
+      errorEdicionServicio.value = resultado.replace(/^Error:\s*/, '');
+      return;
+    }
+
+    servicioEditando.value = null;
+    await buscarServicios();
+
+    mensajeServicio.value = {
+      tipo: 'exito',
+      texto: 'Servicio actualizado correctamente.'
+    };
+
+  } catch (error) {
+    errorEdicionServicio.value = 'No se pudo actualizar el servicio.';
+  } finally {
+    enviandoEdicionServicio.value = false;
+  }
+};
+
+const pedirConfirmacionEliminarServicio = (servicio) => {
+  servicioEditando.value = null;
+  idEliminandoServicio.value = servicio.id_servicio;
+};
+
+const eliminarServicioAdmin = async (servicio) => {
+  const resultado = await controlador.eliminarServicio(
+    servicio.id_servicio
+  );
+
+  if (typeof resultado === 'string' && resultado.startsWith('Error:')) {
+    mensajeServicio.value = {
+      tipo: 'error',
+      texto: resultado.replace(/^Error:\s*/, '')
+    };
+    return;
+  }
+
+  idEliminandoServicio.value = null;
+  await buscarServicios();
+
+  mensajeServicio.value = {
+    tipo: 'exito',
+    texto: `Servicio "${servicio.nombre}" eliminado correctamente.`
+  };
+};
+
+
 // =====================================================
 // PANEL DE ADMINISTRADOR: buscar, editar y cambiar estado
 // =====================================================
@@ -686,75 +982,6 @@ const buscarConRetraso = () => {
   clearTimeout(temporizadorBusqueda);
   temporizadorBusqueda = setTimeout(buscarClientes, 300);
 };
-
-// =====================================================
-// PANEL DE ADMINISTRADOR: GESTIÓN DE SERVICIOS (HU-06)
-// =====================================================
-
-const buscarServicios = async () => {
-  const respuesta = await servicioController.obtenerServicios();
-  if (esError(respuesta)) {
-    mensajeAdmin.value = { tipo: 'error', texto: quitarPrefijoError(respuesta) };
-    return;
-  }
-  listaServicios.value = respuesta;
-};
-
-const estaEditandoServicio = (servicio) => servicioEditando.value?.id_servicio === servicio.id_servicio;
-
-const editarServicio = (servicio) => {
-  servicioEditando.value = { ...servicio };
-  errorEdicionServicio.value = '';
-  idServicioEliminando.value = null;
-  mensajeAdmin.value = { ...MENSAJE_VACIO };
-};
-
-const cancelarEdicionServicio = () => {
-  servicioEditando.value = null;
-  errorEdicionServicio.value = '';
-};
-
-const guardarEdicionServicio = async () => {
-  const erroresVal = validarServicio(servicioEditando.value);
-
-  if (hayErrores(erroresVal)) {
-    errorEdicionServicio.value = Object.values(erroresVal)[0];
-    return;
-  }
-
-  const respuesta = await servicioController.actualizarServicio(servicioEditando.value);
-
-  if (esError(respuesta)) {
-    errorEdicionServicio.value = quitarPrefijoError(respuesta);
-    return;
-  }
-
-  cancelarEdicionServicio();
-  mensajeAdmin.value = { tipo: 'exito', texto: 'Servicio actualizado correctamente.' };
-  await buscarServicios();
-};
-
-const pedirConfirmacionEliminarServicio = (servicio) => {
-  idServicioEliminando.value = servicio.id_servicio;
-  mensajeAdmin.value = { ...MENSAJE_VACIO };
-};
-
-const eliminarServicio = async (servicio) => {
-  const respuesta = await servicioController.eliminarServicio(servicio.id_servicio);
-  idServicioEliminando.value = null;
-
-  if (esError(respuesta)) {
-    mensajeAdmin.value = { tipo: 'error', texto: quitarPrefijoError(respuesta) };
-    return;
-  }
-
-  mensajeAdmin.value = { tipo: 'exito', texto: `Servicio "${servicio.nombre}" eliminado correctamente.` };
-  await buscarServicios();
-};
-// =====================================================
-// FIN PANEL DE ADMINISTRADOR: GESTIÓN DE SERVICIOS (HU-06)
-// =====================================================
-
 
 // ¿Es esta la fila que se está editando?
 const estaEditando = (cliente) => clienteEditando.value?.id_usuario === cliente.id_usuario;
