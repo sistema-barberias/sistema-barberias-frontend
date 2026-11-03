@@ -42,8 +42,9 @@ defineProps({
   inputmode: { type: String, default: undefined }
 });
 
-// Vincula el valor del input con el v-model del componente padre
-const valor = defineModel({ type: String, default: '' });
+// Vincula el valor del input con el v-model del componente padre.
+// Acepta Number porque con type="number" Vue entrega el valor convertido a número.
+const valor = defineModel({ type: [String, Number], default: '' });
 </script>
 
 <style scoped>

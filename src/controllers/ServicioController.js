@@ -1,48 +1,105 @@
-// src/controllers/ServicioController.js
+/**
+ * ServicioController — Comunicación con el backend (API de servicios).
+ *
+ * Sigue las mismas reglas que ClienteController: devuelve el dato pedido,
+ * o un texto que empieza por "Error: ..." si algo falló.
+ * Todas las rutas de servicios exigen sesión de administrador (el token lo agrega api.js).
+ */
+import { peticion } from './api.js';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+// El precio y la duración pueden llegar como número (inputs type="number") o como texto
+const comoTexto = (valor) => String(valor ?? '').trim();
 
-async function peticion(ruta, metodo, cuerpo) {
-  try {
-    const opciones = { method: metodo };
-    if (cuerpo) {
-      opciones.headers = { 'Content-Type': 'application/json' };
-      opciones.body = JSON.stringify(cuerpo);
-    }
-    const respuesta = await fetch(`${API_URL}${ruta}`, opciones);
-    const resultado = await respuesta.json();
-    if (!respuesta.ok) return `Error: ${resultado.mensaje}`;
-    return resultado;
-  } catch (error) {
-    return 'Error: No se pudo conectar con el servidor';
+/**
+ * Valida los datos de un servicio (HU-05 y HU-06), incluido el precio obligatorio (HU-07).
+ * @returns {Object} Errores por campo: nombre, precio o duracion.
+ *                   Si todo está bien devuelve un objeto vacío.
+ */
+export function validarServicio(datos) {
+  const errores = {};
+
+  if (!comoTexto(datos.nombre)) {
+    errores.nombre = 'El nombre del servicio es obligatorio.';
   }
+
+  // HU-07: ningún servicio puede quedar sin precio
+  const precio = Number(comoTexto(datos.precio));
+  if (!comoTexto(datos.precio) || !Number.isFinite(precio) || precio <= 0) {
+    errores.precio = 'Ingresa un precio válido mayor que cero.';
+  }
+
+  const duracion = Number(comoTexto(datos.duracion));
+  if (!comoTexto(datos.duracion) || !Number.isInteger(duracion) || duracion <= 0) {
+    errores.duracion = 'Ingresa una duración válida en minutos.';
+  }
+
+  return errores;
 }
 
-// Validación requerida para la oferta y precios (HU-07)
+// Devuelve el primer mensaje de un objeto de errores (para los métodos que responden con un solo texto)
+const primerError = (errores) => Object.values(errores)[0];
 
+// Datos que espera el backend al registrar o modificar un servicio
+const datosServicio = (datos) => ({
+  nombre: comoTexto(datos.nombre),
+  descripcion: comoTexto(datos.descripcion),
+  precio: Number(comoTexto(datos.precio)),
+  duracion: Number(comoTexto(datos.duracion))
+});
 
 export class ServicioController {
-  // Obtener todos los servicios
-  async obtenerServicios() {
-    return peticion('/api/servicios', 'GET');
+
+  /**
+   * Registra un nuevo servicio en la barbería (HU-05).
+   * @param {{nombre: string, descripcion?: string, precio: string|number, duracion: string|number}} datos
+   * @returns {Promise<object|string>} El servicio creado, o "Error: ..."
+   */
+  async registrarServicio(datos) {
+    const errores = validarServicio(datos);
+    if (primerError(errores)) {
+      return `Error: ${primerError(errores)}`;
+    }
+
+    const resultado = await peticion('/api/servicios', 'POST', datosServicio(datos));
+
+    return typeof resultado === 'string' ? resultado : resultado.servicio;
   }
 
-  // Registrar un servicio (HU-05)
-  async crearServicio(datos) {
-    return peticion('/api/servicios', 'POST', datos);
+  /**
+   * Consulta los servicios registrados en la barbería.
+   * @returns {Promise<object[]|string>} Lista de servicios, o "Error: ..."
+   */
+  async buscarServicios() {
+    const resultado = await peticion('/api/servicios', 'GET');
+
+    return typeof resultado === 'string' ? resultado : resultado.servicios;
   }
 
-  // Modificar servicio (HU-06)
-  async actualizarServicio(datos) {
-    return peticion(`/api/servicios/${datos.id_servicio}`, 'PUT', {
-      nombre: datos.nombre,
-      precio: datos.precio,
-      descripcion: datos.descripcion
-    });
+  /**
+   * Actualiza la información de un servicio (HU-06).
+   * @param {number} id
+   * @param {{nombre: string, descripcion?: string, precio: string|number, duracion: string|number}} datos
+   * @returns {Promise<object|string>} El servicio actualizado, o "Error: ..."
+   */
+  async actualizarServicio(id, datos) {
+    const errores = validarServicio(datos);
+    if (primerError(errores)) {
+      return `Error: ${primerError(errores)}`;
+    }
+
+    const resultado = await peticion(`/api/servicios/${id}`, 'PUT', datosServicio(datos));
+
+    return typeof resultado === 'string' ? resultado : resultado.servicio;
   }
 
-  // Eliminar servicio (HU-06)
-  async eliminarServicio(id_servicio) {
-    return peticion(`/api/servicios/${id_servicio}`, 'DELETE');
+  /**
+   * Elimina definitivamente un servicio (HU-06).
+   * @param {number} id
+   * @returns {Promise<true|string>} true si se eliminó, o "Error: ..."
+   */
+  async eliminarServicio(id) {
+    const resultado = await peticion(`/api/servicios/${id}`, 'DELETE');
+
+    return typeof resultado === 'string' ? resultado : true;
   }
 }
