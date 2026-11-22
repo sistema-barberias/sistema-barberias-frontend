@@ -152,7 +152,7 @@
                 {{ titulo }}
               </button>
 
-              <template v-if="vistaAdmin !== 'servicios'">
+              <template v-if="esVistaUsuarios">
                 <input
                   class="search-input"
                   type="search"
@@ -176,7 +176,7 @@
             Clientes y Barberos (HU-08) comparten esta vista: los dos son usuarios,
             solo cambia el rol que se busca y se crea (rolGestionado).
           -->
-          <div v-if="vistaAdmin !== 'servicios'">
+          <div v-if="esVistaUsuarios">
             <!-- Mensaje general del panel (se oculta mientras el formulario nuevo muestra el suyo) -->
             <p v-if="!mostrarFormNuevo && mensajeAdmin.texto" :class="['alert', mensajeAdmin.tipo]" role="alert">{{ mensajeAdmin.texto }}</p>
 
@@ -273,7 +273,7 @@
           </div>
 
           <!-- Servicios: registrar (HU-05), modificar y eliminar (HU-06), siempre con precio válido (HU-07) -->
-          <div v-else class="services-view">
+          <div v-else-if="vistaAdmin === 'servicios'" class="services-view">
             <form
               class="panel-form"
               novalidate
@@ -515,6 +515,265 @@
               </div>
             </div>
           </div>
+          <!-- Horarios de los barberos (HU-09): jornadas semanales que no se pueden superponer -->
+          <div v-else class="services-view">
+            <form
+              class="panel-form"
+              novalidate
+              @submit.prevent="registrarHorario"
+            >
+              <h3>Asignar horario a un barbero</h3>
+
+              <p class="hint">
+                Los horarios se repiten cada semana. Un barbero no puede tener dos horarios que se crucen el mismo día.
+              </p>
+
+              <p v-if="!cargandoHorarios && listaBarberos.length === 0" class="hint">
+                No hay barberos activos. Crea uno primero en la pestaña Barberos.
+              </p>
+
+              <div class="form-row">
+                <div class="field-select">
+                  <label for="horario-barbero">Barbero</label>
+                  <select
+                    id="horario-barbero"
+                    v-model="formHorario.id_barbero"
+                    class="select-input"
+                    :class="{ invalid: erroresHorario.id_barbero }"
+                  >
+                    <option value="">Selecciona un barbero</option>
+                    <option
+                      v-for="barbero in listaBarberos"
+                      :key="barbero.id_usuario"
+                      :value="barbero.id_usuario"
+                    >
+                      {{ barbero.nombre }}
+                    </option>
+                  </select>
+                  <p v-if="erroresHorario.id_barbero" class="field-error" role="alert">{{ erroresHorario.id_barbero }}</p>
+                </div>
+
+                <div class="field-select">
+                  <label for="horario-dia">Día de la semana</label>
+                  <select
+                    id="horario-dia"
+                    v-model="formHorario.dia_semana"
+                    class="select-input"
+                    :class="{ invalid: erroresHorario.dia_semana }"
+                  >
+                    <option value="">Selecciona un día</option>
+                    <option
+                      v-for="dia in DIAS_SEMANA"
+                      :key="dia.numero"
+                      :value="dia.numero"
+                    >
+                      {{ dia.nombre }}
+                    </option>
+                  </select>
+                  <p v-if="erroresHorario.dia_semana" class="field-error" role="alert">{{ erroresHorario.dia_semana }}</p>
+                </div>
+              </div>
+
+              <div class="form-row">
+                <CampoForm
+                  id="horario-inicio"
+                  label="Hora de inicio"
+                  type="time"
+                  v-model="formHorario.hora_inicio"
+                  :error="erroresHorario.hora_inicio"
+                />
+
+                <CampoForm
+                  id="horario-fin"
+                  label="Hora de fin"
+                  type="time"
+                  v-model="formHorario.hora_fin"
+                  :error="erroresHorario.hora_fin"
+                />
+              </div>
+
+              <p
+                v-if="mensajeHorario.texto"
+                :class="['alert', mensajeHorario.tipo]"
+                role="alert"
+              >
+                {{ mensajeHorario.texto }}
+              </p>
+
+              <div class="form-actions">
+                <button
+                  type="button"
+                  class="btn btn-outline"
+                  @click="cambiarVistaAdmin('clientes')"
+                >
+                  Volver a clientes
+                </button>
+
+                <button
+                  type="submit"
+                  class="btn btn-primary"
+                  :disabled="enviandoHorario"
+                >
+                  {{ enviandoHorario ? 'Asignando...' : 'Asignar horario' }}
+                </button>
+              </div>
+            </form>
+
+            <div class="services-list">
+              <h3>Horarios asignados</h3>
+
+              <p v-if="cargandoHorarios" class="hint">
+                Cargando horarios...
+              </p>
+
+              <div v-else class="table-wrap">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Barbero</th>
+                      <th>Día</th>
+                      <th>Inicio</th>
+                      <th>Fin</th>
+                      <th class="col-actions">Acciones</th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    <tr
+                      v-for="horario in listaHorarios"
+                      :key="horario.id_horario"
+                    >
+                      <td data-label="Barbero">{{ horario.barbero }}</td>
+
+                      <td data-label="Día">
+                        <select
+                          v-if="estaEditandoHorario(horario)"
+                          v-model="horarioEditando.dia_semana"
+                          class="table-input"
+                        >
+                          <option
+                            v-for="dia in DIAS_SEMANA"
+                            :key="dia.numero"
+                            :value="dia.numero"
+                          >
+                            {{ dia.nombre }}
+                          </option>
+                        </select>
+                        <span v-else>{{ nombreDia(horario.dia_semana) }}</span>
+                      </td>
+
+                      <td data-label="Inicio">
+                        <input
+                          v-if="estaEditandoHorario(horario)"
+                          type="time"
+                          v-model="horarioEditando.hora_inicio"
+                          class="table-input"
+                        />
+                        <span v-else>{{ horario.hora_inicio }}</span>
+                      </td>
+
+                      <td data-label="Fin">
+                        <input
+                          v-if="estaEditandoHorario(horario)"
+                          type="time"
+                          v-model="horarioEditando.hora_fin"
+                          class="table-input"
+                        />
+                        <span v-else>{{ horario.hora_fin }}</span>
+                      </td>
+
+                      <td data-label="Acciones" class="col-actions">
+
+                        <!-- Modo edición -->
+                        <template v-if="estaEditandoHorario(horario)">
+                          <p
+                            v-if="errorEdicionHorario"
+                            class="field-error"
+                            role="alert"
+                          >
+                            {{ errorEdicionHorario }}
+                          </p>
+
+                          <div class="actions-cell">
+                            <button
+                              type="button"
+                              class="btn btn-sm btn-primary"
+                              :disabled="enviandoEdicionHorario"
+                              @click="guardarEdicionHorario"
+                            >
+                              {{ enviandoEdicionHorario ? 'Guardando...' : 'Guardar' }}
+                            </button>
+
+                            <button
+                              type="button"
+                              class="btn btn-sm btn-outline"
+                              :disabled="enviandoEdicionHorario"
+                              @click="cancelarEdicionHorario"
+                            >
+                              Cancelar
+                            </button>
+                          </div>
+                        </template>
+
+                        <!-- Confirmación de eliminación -->
+                        <template
+                          v-else-if="idEliminandoHorario === horario.id_horario"
+                        >
+                          <p class="field-error">
+                            ¿Eliminar el horario de {{ horario.barbero }} del {{ nombreDia(horario.dia_semana).toLowerCase() }}?
+                          </p>
+
+                          <div class="actions-cell">
+                            <button
+                              type="button"
+                              class="btn btn-sm btn-danger"
+                              @click="eliminarHorarioAdmin(horario)"
+                            >
+                              Sí, eliminar
+                            </button>
+
+                            <button
+                              type="button"
+                              class="btn btn-sm btn-outline"
+                              @click="idEliminandoHorario = null"
+                            >
+                              Cancelar
+                            </button>
+                          </div>
+                        </template>
+
+                        <!-- Modo normal -->
+                        <div v-else class="actions-cell">
+                          <button
+                            type="button"
+                            class="btn btn-sm btn-outline"
+                            @click="editarHorario(horario)"
+                          >
+                            Editar
+                          </button>
+
+                          <button
+                            type="button"
+                            class="btn btn-sm btn-danger"
+                            @click="pedirConfirmacionEliminarHorario(horario)"
+                          >
+                            Eliminar
+                          </button>
+                        </div>
+
+                      </td>
+                    </tr>
+
+                    <tr v-if="listaHorarios.length === 0">
+                      <td colspan="5" class="no-data">
+                        No hay horarios asignados.
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
     </main>
@@ -526,11 +785,13 @@ import { ref, computed } from 'vue';
 import CampoForm from './components/CampoForm.vue';
 import { ClienteController, validarLogin, validarRegistro } from './controllers/ClienteController.js';
 import { ServicioController, validarServicio } from './controllers/ServicioController.js';
+import { HorarioController, validarHorario, DIAS_SEMANA, nombreDia } from './controllers/HorarioController.js';
 
 // Los controladores son los únicos que hablan con el backend.
 // Sus métodos devuelven el dato pedido, o un texto "Error: ..." si algo falló.
 const controlador = new ClienteController();
 const servicioController = new ServicioController();
+const horarioController = new HorarioController();
 
 // =====================================================
 // UTILIDADES
@@ -539,13 +800,15 @@ const servicioController = new ServicioController();
 const MENSAJE_VACIO = { tipo: '', texto: '' };
 
 // Vistas del panel de administrador: clave interna -> título visible
-const VISTAS_ADMIN = { clientes: 'Clientes', barberos: 'Barberos', servicios: 'Servicios' };
+const VISTAS_ADMIN = { clientes: 'Clientes', barberos: 'Barberos', servicios: 'Servicios', horarios: 'Horarios' };
 
 // Formulario de usuario en blanco (lo usan el registro y el panel de administrador)
 const formVacio = () => ({ nombre: '', telefono: '', correo: '', password: '', confirmarPassword: '' });
 
 // Formulario de servicio en blanco
 const servicioVacio = () => ({ nombre: '', descripcion: '', precio: '', duracion: '' });
+// Formulario de horario en blanco
+const horarioVacio = () => ({ id_barbero: '', dia_semana: '', hora_inicio: '', hora_fin: '' });
 
 // El controlador avisa los errores con un texto que empieza por "Error:".
 const esError = (respuesta) => typeof respuesta === 'string';
@@ -622,6 +885,21 @@ const erroresServicio = ref({});
 const enviandoServicio = ref(false);
 const mensajeServicio = ref({ ...MENSAJE_VACIO });
 
+// --- Horarios de los barberos (HU-09) ---
+// Clientes y Barberos comparten la vista de usuarios; Servicios y Horarios tienen la suya
+const esVistaUsuarios = computed(() => vistaAdmin.value === 'clientes' || vistaAdmin.value === 'barberos');
+const formHorario = ref(horarioVacio());
+const listaHorarios = ref([]);
+const listaBarberos = ref([]);                 // Barberos activos: llenan el desplegable del formulario
+const cargandoHorarios = ref(false);
+const horarioEditando = ref(null);             // Copia del horario que se está editando en la tabla
+const errorEdicionHorario = ref('');
+const idEliminandoHorario = ref(null);
+const enviandoEdicionHorario = ref(false);
+const erroresHorario = ref({});
+const enviandoHorario = ref(false);
+const mensajeHorario = ref({ ...MENSAJE_VACIO });
+
 // =====================================================
 // AUTENTICACIÓN
 // =====================================================
@@ -693,6 +971,15 @@ const reiniciarPanelAdmin = () => {
   errorEdicionServicio.value = '';
   idEliminandoServicio.value = null;
   mensajeServicio.value = { ...MENSAJE_VACIO };
+  
+  formHorario.value = horarioVacio();
+  erroresHorario.value = {};
+  listaHorarios.value = [];
+  listaBarberos.value = [];
+  horarioEditando.value = null;
+  errorEdicionHorario.value = '';
+  idEliminandoHorario.value = null;
+  mensajeHorario.value = { ...MENSAJE_VACIO };
 };
 
 // Cambia entre Clientes, Barberos y Servicios, y carga los datos de la vista elegida
@@ -704,6 +991,8 @@ const cambiarVistaAdmin = async (vista) => {
 
   if (vista === 'servicios') {
     await buscarServicios();
+  } else if (vista === 'horarios') {
+    await cargarVistaHorarios();
   } else {
     await buscarUsuarios();
   }
@@ -886,6 +1175,127 @@ const eliminarServicioAdmin = async (servicio) => {
 
   mensajeServicio.value = { tipo: 'exito', texto: `Servicio "${servicio.nombre}" eliminado correctamente.` };
   await buscarServicios();
+};
+
+// =====================================================
+// PANEL DE ADMINISTRADOR: HORARIOS DE LOS BARBEROS (HU-09)
+// =====================================================
+
+// Pide al backend los horarios de todos los barberos
+const buscarHorarios = async () => {
+  const resultado = await horarioController.buscarHorarios();
+
+  if (esError(resultado)) {
+    mensajeHorario.value = { tipo: 'error', texto: quitarPrefijoError(resultado) };
+    return;
+  }
+
+  listaHorarios.value = resultado;
+};
+
+// Pide los barberos activos: son los que se pueden elegir en el formulario
+const cargarBarberos = async () => {
+  const resultado = await controlador.buscarUsuarios('', 'Barbero');
+
+  if (esError(resultado)) {
+    mensajeHorario.value = { tipo: 'error', texto: quitarPrefijoError(resultado) };
+    return;
+  }
+
+  listaBarberos.value = resultado.filter((barbero) => barbero.estado === 'Activo');
+};
+
+// Carga todo lo que necesita la pestaña Horarios al abrirla
+const cargarVistaHorarios = async () => {
+  cargandoHorarios.value = true;
+  await Promise.all([buscarHorarios(), cargarBarberos()]);
+  cargandoHorarios.value = false;
+};
+
+// HU-09: asigna un horario a un barbero.
+// Si se cruza con otro horario del mismo barbero el backend lo rechaza y se muestra el aviso.
+const registrarHorario = async () => {
+  mensajeHorario.value = { ...MENSAJE_VACIO };
+  erroresHorario.value = validarHorario(formHorario.value);
+  if (hayErrores(erroresHorario.value)) return;
+
+  enviandoHorario.value = true;
+  const resultado = await horarioController.asignarHorario(formHorario.value);
+  enviandoHorario.value = false;
+
+  if (esError(resultado)) {
+    mensajeHorario.value = { tipo: 'error', texto: quitarPrefijoError(resultado) };
+    return;
+  }
+
+  formHorario.value = horarioVacio();
+  mensajeHorario.value = { tipo: 'exito', texto: `Horario del ${nombreDia(resultado.dia_semana).toLowerCase()} asignado correctamente.` };
+  await buscarHorarios();
+};
+
+// ¿Es esta la fila de horario que se está editando?
+const estaEditandoHorario = (horario) => horarioEditando.value?.id_horario === horario.id_horario;
+
+// Pone la fila en modo edición (sobre una copia, así "Cancelar" no deja cambios)
+const editarHorario = (horario) => {
+  horarioEditando.value = { ...horario };
+  errorEdicionHorario.value = '';
+  idEliminandoHorario.value = null;
+  mensajeHorario.value = { ...MENSAJE_VACIO };
+};
+
+const cancelarEdicionHorario = () => {
+  horarioEditando.value = null;
+  errorEdicionHorario.value = '';
+};
+
+// Guarda los cambios de la fila. Si algo falla (por ejemplo, se cruza con otro horario),
+// el error aparece debajo de la fila que se está editando.
+const guardarEdicionHorario = async () => {
+  if (enviandoEdicionHorario.value) return;
+
+  const erroresFila = validarHorario(horarioEditando.value);
+  if (hayErrores(erroresFila)) {
+    errorEdicionHorario.value = Object.values(erroresFila)[0];
+    return;
+  }
+
+  enviandoEdicionHorario.value = true;
+  const resultado = await horarioController.actualizarHorario(
+    horarioEditando.value.id_horario,
+    horarioEditando.value
+  );
+  enviandoEdicionHorario.value = false;
+
+  if (esError(resultado)) {
+    errorEdicionHorario.value = quitarPrefijoError(resultado);
+    return;
+  }
+
+  cancelarEdicionHorario();
+  mensajeHorario.value = { tipo: 'exito', texto: 'Horario actualizado correctamente.' };
+  await buscarHorarios();
+};
+
+// Primer paso para eliminar: muestra "¿Eliminar?" en la fila del horario
+const pedirConfirmacionEliminarHorario = (horario) => {
+  horarioEditando.value = null;
+  idEliminandoHorario.value = horario.id_horario;
+  mensajeHorario.value = { ...MENSAJE_VACIO };
+};
+
+// Segundo paso: elimina el horario
+const eliminarHorarioAdmin = async (horario) => {
+  const resultado = await horarioController.eliminarHorario(horario.id_horario);
+  idEliminandoHorario.value = null;
+
+  if (esError(resultado)) {
+    mensajeHorario.value = { tipo: 'error', texto: quitarPrefijoError(resultado) };
+    return;
+  }
+
+  mensajeHorario.value = { tipo: 'exito', texto: 'Horario eliminado correctamente.' };
+  await buscarHorarios();
 };
 
 // =====================================================
@@ -1125,7 +1535,8 @@ const cambiarEstado = async (usuario) => {
    Aquí solo se estilan el buscador y los campos de la tabla.
    font-size 16px evita que el iPhone haga zoom automático al tocar un campo */
 .search-input,
-.table-input {
+.table-input,
+.select-input {
   width: 100%;
   min-height: var(--touch);
   padding: 10px 12px;
@@ -1136,7 +1547,8 @@ const cambiarEstado = async (usuario) => {
   color: var(--text);
 }
 .search-input:focus,
-.table-input:focus { outline: 2px solid var(--gold); border-color: transparent; }
+.table-input:focus,
+.select-input:focus { outline: 2px solid var(--gold); border-color: transparent; }
 
 /* ---------- Botones ---------- */
 .btn {
@@ -1208,6 +1620,13 @@ const cambiarEstado = async (usuario) => {
 /* ---------- Servicios (HU-05, HU-06, HU-07) ---------- */
 .services-list { display: flex; flex-direction: column; gap: 12px; }
 .services-list h3 { font-size: 1.1rem; }
+
+/* ---------- Horarios (HU-09) ---------- */
+/* Los desplegables del formulario se ven igual que los campos de CampoForm.vue */
+.field-select { display: flex; flex-direction: column; gap: 6px; }
+.field-select label { font-size: .9rem; font-weight: 600; color: var(--ink); }
+.select-input.invalid { border-color: var(--red); background: #fffafa; }
+.select-input, select.table-input { font-family: inherit; }
 
 /* ---------- Tablas del panel (clientes, barberos y servicios) ---------- */
 /*
