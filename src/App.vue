@@ -1361,9 +1361,10 @@ const cancelarEdicion = () => {
 // Guarda el nombre, teléfono y correo editados en la tabla.
 // Si algo falla, el error aparece debajo de la fila que se está editando.
 const guardarEdicion = async () => {
-  // Se reutilizan las reglas del registro (la contraseña no se edita aquí, por eso se completa con una válida)
+  // Se reutilizan las reglas del registro. La cédula y la contraseña no se editan aquí,
+  // por eso se completan con valores válidos (si no, la validación pediría la cédula).
   const { nombre, telefono, correo } = usuarioEditando.value;
-  const erroresFila = validarRegistro({ nombre, telefono: String(telefono ?? ''), correo, password: '123456' });
+  const erroresFila = validarRegistro({ nombre, telefono: String(telefono ?? ''), correo, cedula: '123456', password: '123456' });
 
   if (hayErrores(erroresFila)) {
     errorEdicion.value = Object.values(erroresFila)[0];
