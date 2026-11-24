@@ -1,3 +1,4 @@
+import DisponibilidadCliente from './components/DisponibilidadCliente.vue'; 
 <!--
   App.vue — Pantalla única de BarberFlow.
 
@@ -133,6 +134,7 @@
             </div>
           </div>
           <p class="hint">Pronto podrás agendar tus citas desde aquí.</p>
+          <DisponibilidadCliente v-if="rolActivo === 'Cliente'" />
         </div>
 
         <!-- 3. Panel del Administrador: clientes, barberos (HU-08) y servicios (HU-05 a HU-07) -->
@@ -786,6 +788,7 @@ import CampoForm from './components/CampoForm.vue';
 import { ClienteController, validarLogin, validarRegistro } from './controllers/ClienteController.js';
 import { ServicioController, validarServicio } from './controllers/ServicioController.js';
 import { HorarioController, validarHorario, DIAS_SEMANA, nombreDia } from './controllers/HorarioController.js';
+import DisponibilidadCliente from './components/DisponibilidadCliente.vue';
 
 // Los controladores son los únicos que hablan con el backend.
 // Sus métodos devuelven el dato pedido, o un texto "Error: ..." si algo falló.
