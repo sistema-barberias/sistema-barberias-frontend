@@ -1,13 +1,15 @@
-import DisponibilidadCliente from './components/DisponibilidadCliente.vue'; 
 <!--
   App.vue — Pantalla única de BarberFlow.
 
   Muestra una de tres vistas según el estado de la sesión:
     1. Autenticación (sin sesión): iniciar sesión o crear cuenta.
-    2. Cliente o barbero: resumen de su cuenta.
-    3. Administrador: gestión de clientes, barberos (HU-08) y servicios (HU-05 a HU-07).
+    2. Cliente o barbero: resumen de su cuenta. El cliente además reserva y gestiona
+       sus citas (HU-11 y HU-12, components/CitasCliente.vue) y consulta la
+       disponibilidad de los barberos (HU-10, components/DisponibilidadCliente.vue).
+    3. Administrador: gestión de clientes, barberos (HU-08), servicios (HU-05 a HU-07)
+       y horarios de los barberos (HU-09).
 
-  La comunicación con el backend vive en controllers/ (ClienteController.js y ServicioController.js).
+  La comunicación con el backend vive en controllers/ (un controlador por cada API).
 -->
 <template>
   <div class="app">
@@ -133,11 +135,14 @@ import DisponibilidadCliente from './components/DisponibilidadCliente.vue';
               <p class="value">{{ usuarioLogueado.telefono }}</p>
             </div>
           </div>
-          <p class="hint">Pronto podrás agendar tus citas desde aquí.</p>
-          <DisponibilidadCliente v-if="rolActivo === 'Cliente'" />
+          <!-- El cliente reserva y gestiona sus citas (HU-11, HU-12) y consulta la disponibilidad (HU-10) -->
+          <template v-if="rolActivo === 'Cliente'">
+            <CitasCliente />
+            <DisponibilidadCliente />
+          </template>
         </div>
 
-        <!-- 3. Panel del Administrador: clientes, barberos (HU-08) y servicios (HU-05 a HU-07) -->
+        <!-- 3. Panel del Administrador: clientes, barberos (HU-08), servicios (HU-05 a HU-07) y horarios (HU-09) -->
         <div v-else class="card admin-panel">
           <div class="panel-header">
             <h2>{{ VISTAS_ADMIN[vistaAdmin] }}</h2>
@@ -789,6 +794,7 @@ import { ClienteController, validarLogin, validarRegistro } from './controllers/
 import { ServicioController, validarServicio } from './controllers/ServicioController.js';
 import { HorarioController, validarHorario, DIAS_SEMANA, nombreDia } from './controllers/HorarioController.js';
 import DisponibilidadCliente from './components/DisponibilidadCliente.vue';
+import CitasCliente from './components/CitasCliente.vue';
 
 // Los controladores son los únicos que hablan con el backend.
 // Sus métodos devuelven el dato pedido, o un texto "Error: ..." si algo falló.
@@ -860,7 +866,7 @@ const mensajeExito = ref('');                  // Aviso de éxito mostrado en el
 const enviando = ref(false);                   // Evita envíos dobles mientras se espera al servidor
 
 // --- Panel de administrador ---
-const vistaAdmin = ref('clientes');            // 'clientes' | 'barberos' | 'servicios'
+const vistaAdmin = ref('clientes');            // 'clientes' | 'barberos' | 'servicios' | 'horarios'
 
 // --- Usuarios del panel (vistas Clientes y Barberos, HU-08) ---
 const rolGestionado = computed(() => (vistaAdmin.value === 'barberos' ? 'Barbero' : 'Cliente'));
@@ -974,7 +980,7 @@ const reiniciarPanelAdmin = () => {
   errorEdicionServicio.value = '';
   idEliminandoServicio.value = null;
   mensajeServicio.value = { ...MENSAJE_VACIO };
-  
+
   formHorario.value = horarioVacio();
   erroresHorario.value = {};
   listaHorarios.value = [];
@@ -985,7 +991,7 @@ const reiniciarPanelAdmin = () => {
   mensajeHorario.value = { ...MENSAJE_VACIO };
 };
 
-// Cambia entre Clientes, Barberos y Servicios, y carga los datos de la vista elegida
+// Cambia entre Clientes, Barberos, Servicios y Horarios, y carga los datos de la vista elegida
 const cambiarVistaAdmin = async (vista) => {
   if (vista === vistaAdmin.value) return;
 
