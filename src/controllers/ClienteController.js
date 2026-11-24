@@ -16,6 +16,7 @@ const REGEX_CORREO_REGISTRO = /^[^\s@]+@(gmail|hotmail)\.com$/i; // Registro: so
 const REGEX_SOLO_NUMEROS = /^\d+$/;
 const REGEX_SOLO_LETRAS = /^[A-Za-zÁÉÍÓÚÜáéíóúüÑñ ]+$/; // Nombres: letras (con tildes) y espacios
 const REGEX_PASSWORD = /^\d{6}$/; // Exactamente 6 dígitos
+const REGEX_CEDULA = /^\d{6}(\d{4})?$/;
 
 /**
  * Valida los datos del inicio de sesión.
@@ -46,6 +47,14 @@ export function validarLogin(datos) {
  */
 export function validarRegistro(datos) {
   const errores = {};
+
+  const cedula = (datos.cedula || '').trim();
+
+  if (!cedula) {
+    errores.cedula = 'Ingresa tu número de cédula.';
+  } else if (!REGEX_CEDULA.test(cedula)) {
+    errores.cedula = 'La cédula debe tener exactamente 6 o 10 números.';
+  }
 
   const nombre = (datos.nombre || '').trim();
   if (!nombre) {
@@ -130,6 +139,7 @@ export class ClienteController {
 
     const resultado = await peticion('/api/usuarios/registro', 'POST', {
       nombre: datos.nombre,
+      cedula: datos.cedula.trim(),
       correo: datos.correo,
       telefono: datos.telefono,
       password: datos.password
@@ -151,6 +161,7 @@ export class ClienteController {
 
     const resultado = await peticion('/api/usuarios', 'POST', {
       nombre: datos.nombre,
+      cedula: datos.cedula.trim(),
       correo: datos.correo,
       telefono: datos.telefono,
       password: datos.password,

@@ -97,6 +97,9 @@
 
               <div class="form-row">
                 <CampoForm id="reg-nombre" label="Nombre completo" v-model="formRegistro.nombre" :error="errores.nombre" autocomplete="name" placeholder="Tu nombre" />
+                <CampoForm id="reg-cedula" label="Cédula" type="text" inputmode="numeric" v-model="formRegistro.cedula" :error="errores.cedula" placeholder="6 o 10 números" />
+              </div>
+              <div class="form-row">
                 <CampoForm id="reg-tel" label="Teléfono" type="tel" inputmode="numeric" v-model="formRegistro.telefono" :error="errores.telefono" autocomplete="tel" placeholder="Número de celular" />
               </div>
               <CampoForm id="reg-correo" label="Correo electrónico" type="email" v-model="formRegistro.correo" :error="errores.correo" autocomplete="email" placeholder="correo@gmail.com" />
@@ -192,6 +195,9 @@
               <h3>Nuevo {{ nombreRol }}</h3>
               <div class="form-row">
                 <CampoForm id="adm-nombre" label="Nombre completo" v-model="formNuevo.nombre" :error="erroresNuevo.nombre" :placeholder="`Nombre del ${nombreRol}`" />
+                <CampoForm id="adm-cedula" label="Cédula" type="text" inputmode="numeric" v-model="formNuevo.cedula" :error="erroresNuevo.cedula" placeholder="6 o 10 números" />
+              </div>
+              <div class="form-row">
                 <CampoForm id="adm-tel" label="Teléfono" type="tel" inputmode="numeric" v-model="formNuevo.telefono" :error="erroresNuevo.telefono" placeholder="Número de celular" />
               </div>
               <CampoForm id="adm-correo" label="Correo electrónico" type="email" v-model="formNuevo.correo" :error="erroresNuevo.correo" placeholder="correo@gmail.com" />
@@ -812,7 +818,7 @@ const MENSAJE_VACIO = { tipo: '', texto: '' };
 const VISTAS_ADMIN = { clientes: 'Clientes', barberos: 'Barberos', servicios: 'Servicios', horarios: 'Horarios' };
 
 // Formulario de usuario en blanco (lo usan el registro y el panel de administrador)
-const formVacio = () => ({ nombre: '', telefono: '', correo: '', password: '', confirmarPassword: '' });
+const formVacio = () => ({ nombre: '', cedula: '', telefono: '', correo: '', password: '', confirmarPassword: '' });
 
 // Formulario de servicio en blanco
 const servicioVacio = () => ({ nombre: '', descripcion: '', precio: '', duracion: '' });
@@ -830,6 +836,7 @@ const hayErrores = (errores) => Object.keys(errores).length > 0;
 // en cualquier otro caso va en "general" (se muestra encima del botón).
 const errorDelServidor = (respuesta) => {
   const texto = quitarPrefijoError(respuesta);
+  if (/cédula|cedula/i.test(texto)) return { cedula: texto };
   if (/correo/i.test(texto)) return { correo: texto };
   if (/tel[eé]fono/i.test(texto)) return { telefono: texto };
   return { general: texto };
@@ -1021,6 +1028,7 @@ const enviarNuevoUsuario = async (f, rol) => {
   // Solo se envían los datos personales: el estado lo asigna el backend
   const datos = {
     nombre: f.nombre.trim(),
+    cedula: f.cedula.trim(),
     telefono: f.telefono.trim(),
     correo: f.correo.trim(),
     password: f.password
